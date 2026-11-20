@@ -82,13 +82,20 @@ if [[ "$(dpkg-deb --field "$PACKAGE" Package)" != helixedit ||
   echo "Unexpected Debian package name or architecture; installation aborted." >&2;exit 1
 fi
 echo "Build and tests succeeded. Verified DEB: $PACKAGE"
+INSTALL_HELPER="$SOURCE/scripts/install_ubuntu_deb.sh"
+if [[ ! -f "$INSTALL_HELPER" ]]; then
+  echo "Missing the safe local DEB installer in the source checkout." >&2
+  echo "Update the source from main and retry." >&2
+  exit 2
+fi
 if ! command -v pkexec >/dev/null; then
   echo "Graphical privilege helper pkexec not found." >&2
-  echo "Install manually with: sudo apt install --reinstall '$PACKAGE'"
+  echo "Install in a terminal with: bash '$INSTALL_HELPER' '$PACKAGE'" >&2
   exit 0
 fi
-echo "Requesting Ubuntu system authentication for package installation."
-if pkexec /usr/bin/apt-get install --reinstall -y -- "$PACKAGE"; then
+echo "Staging the package outside private source directories so _apt can read it."
+echo "Requesting Ubuntu system authentication only for apt installation."
+if bash "$INSTALL_HELPER" "$PACKAGE" --pkexec; then
   echo "Upgrade successful. Restart HelixEdit to use the new version."
 else
   echo "Installation cancelled or failed. Package retained at: $PACKAGE" >&2
