@@ -62,10 +62,10 @@ inline QString themeStyle(const QString &name) {
       QScrollBar::add-line,QScrollBar::sub-line {width:0;height:0;}
       QToolTip {background:%2;color:%3;border:1px solid %5;padding:4px;}
     )").arg(bg,panel,text,muted,accent,border,hover);
-    if(dark)return base;
+    QString result=base;
     // Glass-inspired appearance uses alpha-blended panels and layered gradients.
     // Native desktop background blur is not provided by Qt Widgets stylesheets.
-    return base+QStringLiteral(R"(
+    if(!dark)result+=QStringLiteral(R"(
       QMainWindow {
         background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
             stop:0 #e9f4ff,stop:0.35 #faf8ff,stop:0.75 #f1faff,stop:1 #f9edff);
@@ -165,6 +165,125 @@ inline QString themeStyle(const QString &name) {
       QMenu {background:#ffffff;border:1px solid #d5e0f2;border-radius:9px;}
       QMenu::item:selected {background:#e6f1ff;color:#3941a5;}
     )");
+    // HelixEdit 0.2: saturated, glass-inspired chrome (semi-transparent Qt
+    // surfaces, not compositor background blur). Contrast remains readable
+    // in all three named themes and the native icon is unchanged.
+    const bool dracula=name=="Dracula";
+    const QString chrome=dracula?"rgba(48,39,76,236)"
+        :(dark?"rgba(23,32,58,232)":"rgba(250,254,255,221)");
+    const QString stroke=dracula?"#8153BC":(dark?"#42679D":"#8DBBF3");
+    const QString panel=dracula?"rgba(41,33,68,237)"
+        :(dark?"rgba(23,33,58,236)":"rgba(251,252,255,237)");
+    const QString focus=dracula?"#E3A1FF":(dark?"#48DCEC":"#007EEB");
+    const QString softText=dark?"#DDE8FF":"#25466A";
+    const QString hoverFill=dracula?"rgba(177,116,243,65)"
+        :(dark?"rgba(64,173,240,60)":"rgba(60,153,246,43)");
+    return result+QString(R"(
+      QMainWindow {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 %1,stop:0.48 %2,stop:1 %3);}
+      QMainWindow > QWidget {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+        stop:0 %1,stop:0.52 %2,stop:1 %3);}
+      QFrame#activityRail {
+        background:%4;border:1px solid %5;border-radius:19px;
+      }
+      QFrame#workspaceToolPanel {
+        background:%6;border:1px solid %5;border-radius:19px;
+        border-left:3px solid %7;
+      }
+      QFrame#workspaceToolPanel[activeWorkspace="sequence"] {
+        border-left:4px solid #02B9FF;
+      }
+      QFrame#workspaceToolPanel[activeWorkspace="plasmid"] {
+        border-left:4px solid #AF64FF;
+      }
+      QFrame#workspaceToolPanel[activeWorkspace="analysis"] {
+        border-left:4px solid #00CDA4;
+      }
+      QLabel#workspacePanelTitle {
+        color:%8;font-size:14px;font-weight:800;
+        letter-spacing:1px;background:transparent;
+        padding:3px 4px 1px 4px;
+      }
+      QLabel#workspacePanelSubtitle {
+        color:%9;font-size:11px;
+        background:transparent;padding:0px 4px 7px 4px;
+      }
+      QLabel#workspaceGroupHeading {
+        color:%9;font-size:10px;font-weight:bold;
+        background:transparent;padding:9px 4px 3px 4px;
+      }
+      QStackedWidget#workspaceToolStack {
+        background:transparent;border:0;
+      }
+      QScrollArea#workspaceToolsSequence,
+      QScrollArea#workspaceToolsPlasmid,
+      QScrollArea#workspaceToolsAnalysis,
+      QWidget#workspaceToolsContent,
+      QScrollArea#workspaceToolsSequence > QWidget,
+      QScrollArea#workspaceToolsPlasmid > QWidget,
+      QScrollArea#workspaceToolsAnalysis > QWidget {
+        background:transparent;border:0;
+      }
+      QFrame#activityRail QToolButton {
+        background:transparent;border:1px solid transparent;
+        border-radius:15px;color:%8;padding:3px;
+      }
+      QFrame#activityRail QToolButton:hover {
+        background:%10;border-color:%5;
+      }
+      QToolButton#activitySequence:checked {
+        background:rgba(0,168,255,62);border:2px solid #009FFC;
+        color:%8;font-weight:800;
+      }
+      QToolButton#activityPlasmid:checked {
+        background:rgba(164,84,246,70);border:2px solid #AF64FF;
+        color:%8;font-weight:800;
+      }
+      QToolButton#activityAnalysis:checked {
+        background:rgba(0,203,157,60);border:2px solid #00CDA4;
+        color:%8;font-weight:800;
+      }
+      QToolButton[viewNavigation="true"] {
+        background:%10;border:1px solid %5;border-radius:11px;
+        padding:5px 8px;text-align:left;color:%8;
+      }
+      QToolButton[viewNavigation="true"]:checked {
+        background:%10;border:2px solid %7;
+        color:%8;font-weight:800;
+      }
+      QToolButton#contextActionSequence,QToolButton#contextActionPlasmid,
+      QToolButton#contextActionAnalysis {
+        background:%10;border:1px solid %5;border-radius:11px;
+        padding:5px 7px;text-align:left;color:%8;
+      }
+      QToolButton#contextActionSequence:hover {
+        border:2px solid #00B8FF;
+      }
+      QToolButton#contextActionPlasmid:hover {
+        border:2px solid #AF64FF;
+      }
+      QToolButton#contextActionAnalysis:hover {
+        border:2px solid #00CDA4;
+      }
+      QToolButton:focus,QPushButton:focus,QLineEdit:focus,QComboBox:focus {
+        border:2px solid %7;
+      }
+      QWidget#projectSidebar {
+        background:%6;border:1px solid %5;border-radius:16px;
+      }
+      QTabWidget#studioTabs::pane {
+        background:%6;border:1px solid %5;border-radius:15px;
+      }
+      QWidget#mapToolStrip,QWidget#sequenceDisplayStrip {
+        background:%10;border:1px solid %5;border-radius:11px;
+      }
+      QToolTip {background:%6;border:1px solid %7;color:%8;border-radius:9px;}
+    )").arg(
+        dark?(dracula?"#211B35":"#0E1628"):"#D7EDFF",
+        dark?(dracula?"#2C2042":"#122945"):"#EDE3FF",
+        dark?(dracula?"#153C42":"#102C33"):"#CFFAF2",
+        chrome,stroke,panel,focus,softText,
+        dark?"#B3C4E5":"#4F6787",hoverFill);
 }
 inline void applyTheme(const QString &name) {
     qApp->setProperty("helix-theme",name);
