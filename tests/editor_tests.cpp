@@ -1,5 +1,6 @@
 #include "editor.h"
 #include "themes.h"
+#include "source_discovery.h"
 #include <QtTest>
 using namespace helix;
 class EditorTests:public QObject {
@@ -33,6 +34,8 @@ private slots:
             validateDocument(doc);
             QCOMPARE(int(doc.records.size()),specs[i].count);
             for(const auto &record:doc.records){
+                QVERIFY2(!record.name.contains("gi|"),qPrintable(record.name));
+                QVERIFY(record.name.size()<48);
                 QVERIFY(ungapped(record.sequence).size()>0);
                 QVERIFY2(ungapped(record.sequence).size()<=400,qPrintable(record.name));
                 if(doc.alphabet=="RNA") {
@@ -41,10 +44,55 @@ private slots:
                 }
             }
             menu->actions().at(i)->trigger();
+            auto chart=editor.findChild<CompositionView*>("compositionChart");
+            QVERIFY(chart);
+            QVERIFY(chart->ungappedLength()>0);
+            auto tabs=editor.findChild<QTabWidget*>("studioTabs");
+            QVERIFY(tabs);
+            QCOMPARE(tabs->currentIndex(),1); // Open FASTA in the visual Sequence tab.
             QCOMPARE(editor.model->document.alphabet,specs[i].alphabet);
             QCOMPARE(int(editor.model->document.records.size()),specs[i].count);
             QCOMPARE(editor.currentPath(),QString());
         }
+    }
+    void graphicalStatisticsDashboard() {
+        Editor editor(true);
+        QAction *stats=nullptr;
+        for(auto *action:editor.findChildren<QAction*>()) {
+            if(action->text()=="Sequence statistics…"){stats=action;break;}
+        }
+        QVERIFY(stats);
+        bool dialogOpened=false,hasChart=false;
+        QTimer::singleShot(0,&editor,[&]{
+            auto *table=editor.findChild<QTableWidget*>("sequenceStatisticsTable");
+            if(!table)return;
+            dialogOpened=true;
+            hasChart=table->rowCount()>0 &&
+                table->findChild<QProgressBar*>("gcBar")!=nullptr;
+            if(auto *dialog=qobject_cast<QDialog*>(table->window()))dialog->reject();
+        });
+        stats->trigger();
+        QVERIFY(dialogOpened);
+        QVERIFY(hasChart);
+    }
+    void sourceDiscoveryHonorsExistingCheckout() {
+        QTemporaryDir temp;
+        QVERIFY(temp.isValid());
+        QVERIFY(QDir().mkpath(temp.filePath(".git")));
+        QVERIFY(QDir().mkpath(temp.filePath("scripts")));
+        for(const auto &fileName:QStringList{
+            "CMakeLists.txt","scripts/build_ubuntu_deb.sh"}) {
+            QFile file(temp.filePath(fileName));
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write("# offline source discovery test\n");
+            file.close();
+        }
+        QSettings settings("HelixEdit","HelixEdit");
+        const QVariant before=settings.value("updater/source");
+        settings.setValue("updater/source",temp.path());
+        QCOMPARE(discoverSourceFolder(),QDir(temp.path()).canonicalPath());
+        if(before.isValid())settings.setValue("updater/source",before);
+        else settings.remove("updater/source");
     }
     void settingsCentralizePreferencesAndAboutCredits() {
         Editor editor(true);
