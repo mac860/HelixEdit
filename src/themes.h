@@ -19,6 +19,7 @@ inline QString themeStyle(const QString &name) {
     const QString hover=dark?"#3b4559":"#eaf1ff";
     return QString(R"(
       QWidget {font-family:"Inter","Noto Sans","Segoe UI","DejaVu Sans";font-size:12px;color:%3;background:%1;}
+      QLabel,QCheckBox,QRadioButton {background:transparent;border:0;}
       QMainWindow,QDialog {background:%1;color:%3;}
       QMenuBar,QMenu,QStatusBar,QToolBar {background:%2;color:%3;border:0;}
       QMenuBar::item {padding:4px 9px;}
@@ -46,6 +47,10 @@ inline QString themeStyle(const QString &name) {
       QSplitter::handle {background:%6;}
       QWidget#projectSidebar {background:%2;border-right:1px solid %6;}
       QWidget#projectSidebar QLabel#sidebarHeading {font-weight:700;color:%5;}
+      QListWidget#sequenceNavigator::item {padding:4px 6px;border-bottom:1px solid %6;}
+      QListWidget#sequenceNavigator::item:selected {background:%5;color:#ffffff;border-radius:4px;}
+      QListWidget#featureNavigator::item {padding:3px 5px;border-bottom:1px solid %6;}
+      QListWidget#featureNavigator::item:selected {background:%7;border-radius:4px;}
       QWidget#mapToolStrip {background:%2;}
       QTabWidget#commandRibbon::pane {border:0;background:%2;}
       QTabWidget#commandRibbon QTabBar::tab {padding:4px 11px;}
