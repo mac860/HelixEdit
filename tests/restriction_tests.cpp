@@ -20,6 +20,16 @@ private slots:
   QCOMPARE(sites[0].start,8);
   QCOMPARE(sites[0].end,14);
  }
+ void catalogIsUniqueAndPalindromic() {
+  const auto &motifs=restrictionMotifs();
+  QCOMPARE(motifs.size(),26);
+  QSet<QString> names;
+  for(const auto &entry:motifs) {
+   QVERIFY2(!names.contains(entry.first),qPrintable(entry.first));
+   names.insert(entry.first);
+   QCOMPARE(reverseComplement(entry.second),entry.second);
+  }
+ }
  void verifiedCommonPalindromicSites() {
   Record r;r.name="source";r.sequence="GGGCTAGCTTTGGTACCACGCGT";
   auto sites=findRestrictionSites(r);
