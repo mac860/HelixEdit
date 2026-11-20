@@ -121,9 +121,12 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
         p.setPen(QPen(line,1));
         p.drawLine(center+unit*(radius-8),center+unit*(radius+8));
         p.setPen(muted);
-        const QPointF label=center+unit*(radius+24);
-        p.drawText(QRectF(label.x()-25,label.y()-10,50,20),Qt::AlignCenter,
-            QString::number(j?int(n*j/8.):1));
+        // Keep coordinate ticks inside the ring when enzyme callouts occupy the exterior.
+        if(!showEnzymes || j%2==0) {
+            const QPointF label=center+unit*(showEnzymes?radius-21:radius+24);
+            p.drawText(QRectF(label.x()-23,label.y()-9,46,18),Qt::AlignCenter,
+                QString::number(j?int(n*j/8.):1));
+        }
     }
     if(showFeatures) {
         for(int i=0;i<record.features.size();++i) {
@@ -142,23 +145,30 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
             p.setPen(Qt::NoPen);p.setBrush(color);
             p.drawPolygon(QPolygonF{end+tangent*9,
                 end-tangent*6+radial*9,end-tangent*6-radial*9});
-            const qreal mid=(f.start+f.end)*M_PI/n-M_PI/2;
-            const QPointF midpoint=center+QPointF(std::cos(mid),std::sin(mid))*(radius-36);
-            QFont labelFont=p.font();labelFont.setPointSize(9);labelFont.setBold(true);
-            p.setFont(labelFont);p.setPen(dark?QColor("#f2f2fb"):QColor("#2b3545"));
-            const qreal width=qMax<qreal>(48,qMin<qreal>(140,f.name.size()*7+12));
-            p.drawText(QRectF(midpoint.x()-width/2,midpoint.y()-10,width,20),
-                Qt::AlignCenter,f.name.left(19));
+            // On compact maps, prioritize legible sequence name over overlapping feature labels.
+            // All features are listed with complete names and coordinates in the Features tab.
+            if(radius>=205 && f.end-f.start>=n/8) {
+                const qreal mid=(f.start+f.end)*M_PI/n-M_PI/2;
+                const QPointF midpoint=center+QPointF(std::cos(mid),std::sin(mid))*(radius-40);
+                QFont labelFont=p.font();labelFont.setPointSize(8);labelFont.setBold(true);
+                p.setFont(labelFont);p.setPen(dark?QColor("#f2f2fb"):QColor("#2b3545"));
+                const qreal w=qMin<qreal>(95,f.name.size()*6+12);
+                p.drawText(QRectF(midpoint.x()-w/2,midpoint.y()-9,w,18),
+                    Qt::AlignCenter,QFontMetrics(labelFont).elidedText(f.name,Qt::ElideRight,int(w)));
+            }
         }
     }
-    QFont centerFont=p.font();centerFont.setPointSize(14);centerFont.setBold(true);
+    QFont centerFont=p.font();centerFont.setPointSize(11);centerFont.setBold(true);
     p.setFont(centerFont);p.setPen(foreground);
-    p.drawText(QRectF(center.x()-110,center.y()-35,220,30),
-        Qt::AlignCenter,record.name.left(26));
-    centerFont.setPointSize(10);centerFont.setBold(false);
+    const qreal centerWidth=qMin<qreal>(radius*1.05,160);
+    const QString centerTitle=QFontMetrics(centerFont).elidedText(record.name,
+        Qt::ElideMiddle,int(centerWidth));
+    p.drawText(QRectF(center.x()-centerWidth/2,center.y()-27,centerWidth,24),
+        Qt::AlignCenter,centerTitle);
+    centerFont.setPointSize(9);centerFont.setBold(false);
     p.setFont(centerFont);p.setPen(muted);
-    p.drawText(QRectF(center.x()-110,center.y()+4,220,25),Qt::AlignCenter,
-        QLocale().toString(n)+" bp  ·  CIRCULAR");
+    p.drawText(QRectF(center.x()-centerWidth/2,center.y()+2,centerWidth,20),
+        Qt::AlignCenter,QLocale().toString(n)+" bp  ·  circular");
     if(showEnzymes && alphabet!="Protein") {
         struct Callout { QString title; QPointF anchor; bool right; };
         QVector<Callout> left,right;
@@ -1057,7 +1067,9 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     navFilter->setObjectName("navigatorFilter");sl->addWidget(navFilter);
     navigator_=new QListWidget; navigator_->setObjectName("sequenceNavigator");
     navigator_->setSelectionMode(QAbstractItemView::SingleSelection);
-    navigator_->setMinimumHeight(110);
+    navigator_->setMinimumHeight(120);
+    navigator_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    navigator_->setTextElideMode(Qt::ElideRight);
     sl->addWidget(navigator_,2);
     auto overview=new QGroupBox("DOCUMENT");
     auto ov=new QVBoxLayout(overview);stats_=new QLabel;
@@ -1138,9 +1150,11 @@ void Editor::refresh() {
         for(int i=0;i<d.records.size();++i) {
             const auto &r=d.records[i];
             const int n=ungapped(r.sequence).size();
-            auto item=new QListWidgetItem(r.name+"\n"+
+            const QString shortName=r.name.size()>30?r.name.left(29)+"…":r.name;
+            auto item=new QListWidgetItem(shortName+"\n"+
                 QString("%1  ·  %2 %3").arg(r.circular?"◉ circular":"— linear")
                     .arg(QLocale().toString(n)).arg(d.alphabet=="Protein"?"aa":"bp"));
+            item->setSizeHint(QSize(210,42));
             item->setData(Qt::UserRole,i);
             item->setToolTip(r.name+"  ·  "+QString::number(n)+" residues");
             item->setHidden(!item->text().contains(filterText,Qt::CaseInsensitive));
@@ -1149,7 +1163,9 @@ void Editor::refresh() {
         if(!d.records.isEmpty())navigator_->setCurrentRow(chosen);
     }
     notice_->setVisible(!d.warnings.isEmpty());
-    notice_->setText(d.warnings.join(" "));
+    const QString warningText=d.warnings.join(" ");
+    notice_->setText(QFontMetrics(notice_->font()).elidedText(warningText,Qt::ElideRight,qMax(240,notice_->width()-25)));
+    notice_->setToolTip(warningText);
     updateSelection();
     statusBar()->showMessage(QString("%1 sequences  ·  %2 columns  ·  DNA, protein and annotation workspaces")
         .arg(d.records.size()).arg(helix::width(d)));
@@ -1163,7 +1179,7 @@ void Editor::updateSelection() {
     const QString pos=ranges.isEmpty()?"No selected cells"
         :QString("Columns %1–%2").arg(ranges.first().left()+1).arg(ranges.first().right()+1);
     selection_->setText(QString("<b>%1</b><br>%2 residues  ·  %3<br>GC: %4")
-        .arg(r.name.toHtmlEscaped()).arg(ungapped(r.sequence).size()).arg(pos)
+        .arg((r.name.size()>42?r.name.left(41)+"…":r.name).toHtmlEscaped()).arg(ungapped(r.sequence).size()).arg(pos)
         .arg(doc.alphabet=="Protein"?"n/a":number(gcPercent(r.sequence))));
     if(navigator_&&navigator_->currentRow()!=row) {
         QSignalBlocker block(navigator_);
@@ -1177,13 +1193,14 @@ void Editor::updateSelection() {
         .arg(r.name).arg(QLocale().toString(ungapped(r.sequence).size()))
         .arg(doc.alphabet=="Protein"?"aa":"bp")
         .arg(r.circular?"Circular":"Linear"));
+    features_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     features_->clear();
     if(annotationTable_)annotationTable_->clear();
     for(int i=0;i<r.features.size();++i) {
         const auto &f=r.features[i];
         auto item=new QListWidgetItem(QString("%1\n%2–%3  %4")
             .arg(f.name).arg(f.start+1).arg(f.end).arg(f.reverse?"←":"→"));
-        item->setForeground(featureColor(i));features_->addItem(item);
+        item->setForeground(featureColor(i));item->setSizeHint(QSize(190,40));features_->addItem(item);
         if(annotationTable_) {
             auto tree=new QTreeWidgetItem(annotationTable_,
                 QStringList{f.name,f.type,QString::number(f.start+1),
