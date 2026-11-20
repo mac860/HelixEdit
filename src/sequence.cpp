@@ -205,9 +205,20 @@ Document readDocument(const QString &path) {
         }
         validateDocument(d); return d;
     }
-    if(text.trimmed().startsWith('>')) return parseFasta(text);
-    if(text.trimmed().startsWith("LOCUS")) return parseGenBank(text);
-    if(text.startsWith("CLUSTAL") || text.startsWith("MUSCLE")) return parseClustal(text);
+    // FASTA permits leading blank/comment lines. Detect the first real
+    // record rather than insisting that > is the first byte of the file.
+    QString firstDataLine;
+    for(const QString &line:text.split('\n')) {
+        const QString trimmed=line.trimmed();
+        if(trimmed.isEmpty() || trimmed.startsWith(';') || trimmed.startsWith('#'))
+            continue;
+        firstDataLine=trimmed;
+        break;
+    }
+    if(firstDataLine.startsWith('>')) return parseFasta(text);
+    if(firstDataLine.startsWith("LOCUS")) return parseGenBank(text);
+    if(firstDataLine.startsWith("CLUSTAL") || firstDataLine.startsWith("MUSCLE"))
+        return parseClustal(text);
     fail("Supported input: FASTA, CLUSTAL, GenBank or .helix project."); return {};
 }
 QString reverseComplement(const QString &seq,bool rna) {
