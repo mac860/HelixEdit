@@ -97,9 +97,15 @@ void WrappedSequenceView::recalculateLayout() {
 }
 
 void WrappedSequenceView::setRecord(const Record &record,const QString &alphabet) {
-    const bool changed=record_.sequence!=record.sequence ||
+    bool changed=record_.sequence!=record.sequence ||
         record_.name!=record.name || alphabet_!=alphabet ||
-        record_.features!=record.features; // features compared below via explicit fields if needed
+        record_.features.size()!=record.features.size();
+    if(!changed)for(int i=0;i<record.features.size();++i) {
+        const auto &before=record_.features[i],&after=record.features[i];
+        if(before.name!=after.name || before.type!=after.type ||
+           before.start!=after.start || before.end!=after.end ||
+           before.reverse!=after.reverse) {changed=true;break;}
+    }
     record_=record;
     alphabet_=alphabet;
     coordinatePrefix_.clear();
