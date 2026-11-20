@@ -8,6 +8,7 @@ namespace helix {
 // A read-only, responsive view of the selected alignment row. The editable
 // QTableView remains available when Wrap to Window is switched off.
 class WrappedSequenceView final : public QAbstractScrollArea {
+    Q_OBJECT
 public:
     explicit WrappedSequenceView(QWidget *parent=nullptr);
     void setRecord(const Record &record,const QString &alphabet);
