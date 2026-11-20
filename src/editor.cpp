@@ -1171,14 +1171,21 @@ Editor::Editor(bool preview):preview_(preview) {
         table->setCurrentIndex(idx);
         table->edit(idx);
     };
-    auto actions=new QHBoxLayout;actions->setContentsMargins(10,0,10,10);
-    for(auto item:QStringList{"+ Gap","Delete columns","Reverse complement","Translate"}) {
-        auto b=new QPushButton(item);actions->addWidget(b);
-        if(item=="+ Gap")connect(b,&QPushButton::clicked,this,[this]{gapColumns(true);});
-        else if(item=="Delete columns")connect(b,&QPushButton::clicked,this,[this]{gapColumns(false);});
-        else if(item=="Translate")connect(b,&QPushButton::clicked,this,&Editor::translateSelected);
-        else connect(b,&QPushButton::clicked,this,&Editor::reverseSelected);
-    }actions->addStretch();al->addLayout(actions);tabs_->addTab(alignment,"01  Alignment");
+    // Selection operations live in Edit/Analysis and a grid context menu,
+    // not in a second button bar consuming the sequence canvas height.
+    table->viewport()->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(table->viewport(),&QWidget::customContextMenuRequested,this,
+        [this,gapA,reverseA,translateA,edit](const QPoint &pos){
+            QMenu menu(this);
+            menu.addAction(gapA);
+            for(QAction *action:edit->actions())
+                if(action->text()=="Delete selected columns…")menu.addAction(action);
+            menu.addSeparator();
+            menu.addAction(reverseA);
+            menu.addAction(translateA);
+            menu.exec(table->viewport()->mapToGlobal(pos));
+        });
+    tabs_->addTab(alignment,"01  Alignment");
     auto mapPage=new QWidget;auto ml=new QVBoxLayout(mapPage);mapTitle_=new QLabel;mapTitle_->setStyleSheet("font-size:13px;font-weight:600;padding:4px;");ml->addWidget(mapTitle_);
     auto mapStrip=new QWidget(mapPage);mapStrip->setObjectName("mapToolStrip");
     auto mapStripLayout=new QHBoxLayout(mapStrip);
@@ -1579,7 +1586,7 @@ Editor::Editor(bool preview):preview_(preview) {
         statusBar()->showMessage("Project autosaved.");
     }catch(const std::exception &e){statusBar()->showMessage("Autosave failed: "+QString::fromUtf8(e.what()));}});autosave_->start();
     if(!preview_ && QFile::exists(recoveryPath_)) {
-        if(QMessageBox::question(this,"Recover previous session?","A recovery project from an interrupted session is available. Open it?")==QMessageBox::Yes)runSafely([this]{setDocument(readDocument(recoveryPath_));history->resetClean();notice_->setText("Recovered session. Save a new project to keep it.");});
+        if(QMessageBox::question(this,"Recover previous session?","A recovery project from an interrupted session is available. Open it?")==QMessageBox::Yes)runSafely([this]{setDocument(readDocument(recoveryPath_));history->resetClean();statusBar()->showMessage("Recovered session. Save a new project to keep it.",10000);});
         else QFile::remove(recoveryPath_);
     }
 }
@@ -1633,10 +1640,11 @@ void Editor::refresh() {
                                       d.alphabet!="Protein");
     if(wrappedFeaturesToggle_)
         wrappedFeaturesToggle_->setEnabled(wrapToggle_ && wrapToggle_->isChecked());
+    const QString warningText=d.warnings.join("\n\n");
+    notice_->setText(QString("ⓘ %1 notice%2")
+        .arg(d.warnings.size()).arg(d.warnings.size()==1?"":"s"));
+    notice_->setToolTip(warningText+"\n\nHelp → Document notices…");
     notice_->setVisible(!d.warnings.isEmpty());
-    const QString warningText=d.warnings.join(" ");
-    notice_->setText(QFontMetrics(notice_->font()).elidedText(warningText,Qt::ElideRight,qMax(240,notice_->width()-25)));
-    notice_->setToolTip(warningText);
     updateSelection();
     statusBar()->showMessage(QString("%1 sequences  ·  %2 columns  ·  DNA, protein and annotation workspaces")
         .arg(d.records.size()).arg(helix::width(d)));
