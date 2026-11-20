@@ -1,6 +1,8 @@
 #include "editor.h"
 #include "themes.h"
 #include "source_discovery.h"
+#include "restriction.h"
+#include <algorithm>
 #include <QtSvg/QSvgRenderer>
 #include <QtTest>
 using namespace helix;
@@ -185,6 +187,42 @@ private slots:
         for(const auto *action:editor.findChildren<QAction*>())
             found |= action->text().contains("update from GitHub source",Qt::CaseInsensitive);
         QVERIFY(found);
+    }
+    void circularMapTracksActiveSequenceAndTopology() {
+        Editor editor(true);
+        const auto d=parseFasta(">Addgene_NGS_Result\nAAAGAATTCTTT\n");
+        editor.setDocument(d);
+        auto *map=editor.findChild<MapView*>("plasmidMap");
+        auto *topology=editor.findChild<QCheckBox*>("confirmedCircularTopology");
+        auto *unique=editor.findChild<QCheckBox*>("uniqueCuttersFilter");
+        QVERIFY(map);
+        QVERIFY(topology);
+        QVERIFY(unique);
+        QVERIFY(!topology->isChecked());
+        QVERIFY(map->record.features.isEmpty());
+        topology->click();
+        QVERIFY(topology->isChecked());
+        QVERIFY(map->record.circular);
+        auto all=findRestrictionSites(map->record);
+        QVERIFY(std::any_of(all.begin(),all.end(),[](const RestrictionSite &site){
+            return site.enzyme=="EcoRI" && site.start==3;
+        }));
+        auto render=[&]() {
+            QImage image(900,640,QImage::Format_ARGB32_Premultiplied);
+            image.fill(Qt::transparent);
+            QPainter painter(&image);
+            map->draw(painter,QRectF(0,0,900,640));
+            return image;
+        };
+        const auto before=render();
+        editor.editResidue(0,3,'T'); // destroys GAATTC
+        auto changed=findRestrictionSites(map->record);
+        QVERIFY(std::none_of(changed.begin(),changed.end(),[](const RestrictionSite &site){
+            return site.enzyme=="EcoRI";
+        }));
+        const auto after=render();
+        QVERIFY2(!(before==after),"Circular map must redraw site labels after base edits.");
+        QVERIFY(map->record.features.isEmpty());
     }
     void wrapToWindowReflowsAndPreservesEditableSequence() {
         Editor e(true);
