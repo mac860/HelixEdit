@@ -4,7 +4,7 @@
 
 Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
 
-**Status: 0.1.2 beta development on `main` (new GUI compilation/CI verification pending).** The preceding 0.1.1 Ubuntu 26.04 x86_64 source build was confirmed by a user after compiler fixes; that confirmation does not validate the new 0.1.2 GUI. CI workflows target Ubuntu x86_64/ARM64 and macOS Apple Silicon. Test each new artifact before release.
+**Status: 0.1.3 beta development on `main` (compilation/CI verification pending).** The preceding 0.1.2 GUI was successfully installed and screenshotted on Ubuntu 26.04 x86_64 by a user, but this does not validate the new 0.1.3 updater and bundled examples. GitHub Actions targets Ubuntu x86_64/ARM64 and macOS Apple Silicon. Run tests before publishing.
 
 ![HelixEdit sequence map](docs/map.png)
 
@@ -15,6 +15,35 @@ Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing wor
 The interface uses a compact top toolbar, left searchable sequence navigator, and map-first tabs: **Map, Sequence, Enzymes, Features, Primers, History and Tools**. Circular and linear maps draw readable colored annotations and exact enzyme recognition positions. Map layers and zoom are adjustable; undo, primer library and reproducibility logs are functional. Appearance settings include **Light, Dark and Dracula**.
 
 The built-in enzyme catalog remains an eight-motif scientific preview, not a full digest simulator. Primer3 and other scientific engines require their own optional installations. See [GUI design, functionality and validation notes](docs/GUI_012.md).
+
+## 0.1.3: Update from GitHub source in the app
+
+After installing **HelixEdit 0.1.3 or later**, click **Update** in the upper-right toolbar or choose **Help → Check / update from GitHub source…**. Select the **existing Git clone** (for example `~/Downloads/helix2/HelixEdit`) once; its location is remembered. The app offers two operations:
+
+1. **Check GitHub:** fetches the remote `main` state and lists new commits; does not change your local files or installed package.
+2. **Update, test & install:** after confirmation, fast-forwards the clean source checkout to the official GitHub `main`, compiles the native Qt application, runs CTest, builds a versioned `.deb`, and requests Ubuntu authentication through `pkexec` for a local package upgrade. Restart HelixEdit to load the update.
+
+The update process **does not run in the background**, does not discard local edits, and never compiles as root. Network access is needed for GitHub checks; the app does not upload sequence data. If an old installation lacks the updater, upgrade **once** using the commands in the Ubuntu build section below. If `pkexec` is missing, it leaves the built DEB and prints a manual installation command. On macOS, update through your source checkout and rebuild until a separate signed macOS updater is implemented. See [Updater details and limitations](docs/GUI_013.md).
+
+From a terminal, the equivalent commands are:
+
+```bash
+cd ~/Downloads/helix2/HelixEdit
+bash scripts/update_from_source.sh "$(pwd)" --check
+bash scripts/update_from_source.sh "$(pwd)" --apply
+```
+
+## 0.1.3: 14 offline teaching examples
+
+Choose **File → Open teaching examples** (or **Examples** in the compact toolbar). Three ready-to-edit FASTA collections are packaged and embedded in the application:
+
+| Collection | Contents | Length | Reference/provenance |
+|---|---|---:|---|
+| DNA | 6 orchid ITS/5.8S DNA fragments | 300 nt each | Biopython `ls_orchid.fasta` with EMBL accession labels |
+| RNA | 3 **simulated** RNA transcriptions (T→U) of public orchid DNA fragments | 300 nt each | Biopython source DNA; not experimentally verified mature transcripts |
+| Protein | 5 UniProt entries: GFP, insulin precursor, alpha/beta hemoglobin, E. coli aspartate aminotransferase | 110–396 aa | UniProtKB accessions in FASTA headers |
+
+All records are shorter than 400 sequence characters, load without internet access, and are suitable for interface and import practice. The protein set is not a homologous alignment; do not infer phylogeny from it. See [sequence sources and reuse notes](examples/samples/README.md).
 
 ## Three scientific workspaces (development roadmap)
 
@@ -72,12 +101,12 @@ git pull --ff-only origin main
 bash scripts/build_ubuntu_deb.sh
 ```
 
-The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.2-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
+The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.3-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
 
 Install the generated package (use the exact path printed by the script):
 
 ```bash
-sudo apt install ./build-ubuntu-amd64/HelixEdit-0.1.2-x86_64.deb
+sudo apt install ./build-ubuntu-amd64/HelixEdit-0.1.3-x86_64.deb
 helixedit
 ```
 
