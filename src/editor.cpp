@@ -17,17 +17,23 @@
 #include <unistd.h>
 #endif
 namespace helix {
+static bool darkResidues() {
+    return isDarkTheme(qApp->property("helix-theme").toString());
+}
 static QColor residueColor(QChar c,bool protein) {
+    const bool dark=darkResidues();
     if(protein) {
-        if(QString("AVLIMFWY").contains(c)) return QColor("#dcebe3");
-        if(QString("KRH").contains(c)) return QColor("#e5dafa");
-        if(QString("DE").contains(c)) return QColor("#ffd9d4");
-        if(QString("STNQ").contains(c)) return QColor("#d8eef7");
-        return QColor("#f4eee0");
+        if(QString("AVLIMFWY").contains(c))return QColor(dark?"#18554f":"#c8f7e9");
+        if(QString("KRH").contains(c))return QColor(dark?"#4e3977":"#e4d9ff");
+        if(QString("DE").contains(c))return QColor(dark?"#733e52":"#ffe0e7");
+        if(QString("STNQ").contains(c))return QColor(dark?"#234f72":"#d6edff");
+        return QColor(dark?"#514a60":"#faf1d6");
     }
-    if(c=='A') return QColor("#cbf1df"); if(c=='C') return QColor("#d2e9ff");
-    if(c=='G') return QColor("#ffe8b5"); if(c=='T'||c=='U') return QColor("#ffd6df");
-    return QColor("#f0edf7");
+    if(c=='A')return QColor(dark?"#185b48":"#c2f5de");
+    if(c=='C')return QColor(dark?"#1a5275":"#cce9ff");
+    if(c=='G')return QColor(dark?"#675022":"#fff0bd");
+    if(c=='T'||c=='U')return QColor(dark?"#73384f":"#ffd8e7");
+    return QColor(dark?"#453e5c":"#f1eafb");
 }
 static QString number(double value) {return value<0?"undefined":QString::number(value,'f',1)+"%";}
 QVariant AlignmentModel::data(const QModelIndex &i,int role) const {
@@ -36,8 +42,10 @@ QVariant AlignmentModel::data(const QModelIndex &i,int role) const {
     QChar c=present?r.sequence[i.column()]:QChar(' ');
     if(role==Qt::DisplayRole || role==Qt::EditRole) return QString(c);
     if(role==Qt::TextAlignmentRole) return int(Qt::AlignCenter);
-    if(role==Qt::BackgroundRole) return present?residueColor(c,document.alphabet=="Protein"):QColor("#faf9fc");
-    if(role==Qt::ForegroundRole) return QColor(c=='-'?"#a09aaf":"#29283c");
+    if(role==Qt::BackgroundRole) return present?residueColor(c,document.alphabet=="Protein"):
+        (darkResidues()?QColor("#1c2534"):QColor("#f5f9ff"));
+    if(role==Qt::ForegroundRole) return QColor(c=='-'?(darkResidues()?"#8997b3":"#a09aaf"):
+        (darkResidues()?"#f6f7fd":"#263752"));
     if(role==Qt::ToolTipRole) return r.name+"\nAlignment column "+QString::number(i.column()+1)+(present?"":" (outside sequence)");
     return {};
 }
