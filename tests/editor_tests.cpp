@@ -18,7 +18,7 @@ private slots:
         auto studio=editor.findChild<QTabWidget*>("studioTabs");
         QVERIFY(studio);
         const QStringList expected={"Map","Sequence","Enzymes","Features","Primers","History","Tools"};
-        QCOMPARE(studio->count(),expected.size());
+        QCOMPARE(studio->count(),int(expected.size()));
         for(int i=0;i<expected.size();++i)QCOMPARE(studio->tabText(i),expected[i]);
         QCOMPARE(studio->currentIndex(),0);
         auto map=editor.findChild<MapView*>("plasmidMap");
