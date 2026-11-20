@@ -33,6 +33,10 @@ jobs:
         run: |
           bash scripts/build_muscle_arm64.sh "$RUNNER_TEMP/helix-tools"
           echo "$RUNNER_TEMP/helix-tools/bin" >> "$GITHUB_PATH"
+      - name: Validate source updater shell syntax
+        run: |
+          bash -n scripts/update_from_source.sh
+          bash -n scripts/build_ubuntu_deb.sh
       - name: Configure and build
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
