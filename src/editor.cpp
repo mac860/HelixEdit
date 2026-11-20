@@ -446,6 +446,8 @@ Editor::Editor(bool preview):preview_(preview) {
             statusBar()->showMessage(QString("Imported %1 plasmid record(s); save your .helix project.").arg(imported.records.size()));
         });
     });
+    fileMenu->addAction("Attach matching GenBank annotations to active sequence…",
+        this,&Editor::importMatchingGenBankAnnotations);
     fileMenu->addAction("Export FASTA / CLUSTAL…",this,&Editor::exportFile);
     fileMenu->addAction("Export annotated GenBank…",this,[this]{
         const QString path=QFileDialog::getSaveFileName(this,"Export GenBank",{},"GenBank (*.gb)");
@@ -1279,10 +1281,13 @@ Editor::Editor(bool preview):preview_(preview) {
     featureLayout->addWidget(annotationTable_,1);
     auto featureActions=new QHBoxLayout;
     auto createFeature=new QPushButton("+ Add feature");
+    auto importAnnotations=new QPushButton("Import matching GenBank annotations…");
+    importAnnotations->setObjectName("importMatchingAnnotations");
     auto exportFeatures=new QPushButton("Export GenBank…");
-    featureActions->addWidget(createFeature);featureActions->addWidget(exportFeatures);
+    featureActions->addWidget(createFeature);featureActions->addWidget(importAnnotations);featureActions->addWidget(exportFeatures);
     featureActions->addStretch();featureLayout->addLayout(featureActions);
     connect(createFeature,&QPushButton::clicked,feat,&QPushButton::click);
+    connect(importAnnotations,&QPushButton::clicked,this,&Editor::importMatchingGenBankAnnotations);
     connect(exportFeatures,&QPushButton::clicked,gbExportA,&QAction::trigger);
     connect(annotationTable_,&QTreeWidget::itemActivated,this,[this,alignment](QTreeWidgetItem *item,int){
         if(!item)return;
@@ -1592,6 +1597,39 @@ void Editor::open(){if(!canReplace())return;auto p=QFileDialog::getOpenFileName(
 bool Editor::save(bool as){QString p=path_;if(as||p.isEmpty())p=QFileDialog::getSaveFileName(this,"Save HelixEdit project",p,"HelixEdit project (*.helix)");if(p.isEmpty())return false;if(!p.endsWith(".helix",Qt::CaseInsensitive))p+=".helix";try{savePath(p);return true;}catch(const std::exception &e){QMessageBox::warning(this,"Save failed",e.what());return false;}}
 void Editor::exportFile(){auto p=QFileDialog::getSaveFileName(this,"Export sequences (features and topology omitted)",{},"FASTA (*.fasta);;CLUSTAL (*.aln)");if(p.isEmpty())return;runSafely([&]{QString data=p.endsWith(".aln",Qt::CaseInsensitive)?clustal(model->document):fasta(model->document);QSaveFile f(p);if(!f.open(QIODevice::WriteOnly)||f.write(data.toUtf8())!=data.toUtf8().size()||!f.commit())throw std::runtime_error(f.errorString().toStdString());statusBar()->showMessage("Sequence-only export saved; project metadata is retained in .helix only.");});}
 void Editor::addSequence(){if(busy())return;QDialog dlg(this);dlg.setWindowTitle("Add a sequence");auto l=new QVBoxLayout(&dlg);auto name=new QLineEdit;name->setPlaceholderText("Sequence name");l->addWidget(name);auto seq=new QPlainTextEdit;seq->setPlaceholderText("Paste residues or a FASTA record");l->addWidget(seq);auto buttons=new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);l->addWidget(buttons);connect(buttons,&QDialogButtonBox::accepted,&dlg,&QDialog::accept);connect(buttons,&QDialogButtonBox::rejected,&dlg,&QDialog::reject);dlg.resize(480,310);if(dlg.exec()!=QDialog::Accepted)return;runSafely([&]{auto d=model->document;auto text=seq->toPlainText().trimmed();if(text.startsWith('>')){auto incoming=parseFasta(text);for(const auto &r:incoming.records)d.records.append(r);}else d.records.append(Record{name->text().trimmed(),validateSequence(text),{},false});commit(d,"Add sequence");});}
+void Editor::importMatchingGenBankAnnotations() {
+    if(busy()||model->document.alphabet=="Protein")return;
+    const QString path=QFileDialog::getOpenFileName(this,
+        "Attach annotated GenBank · sequence must match active record exactly",{},
+        "GenBank (*.gb *.gbk *.genbank);;All files (*)");
+    if(path.isEmpty())return;
+    runSafely([&]{
+        const Document imported=readDocument(path);
+        if(imported.records.size()!=1 || imported.alphabet!=model->document.alphabet)
+            throw std::runtime_error("Choose a single DNA/RNA GenBank record matching the current molecule type.");
+        const Record &source=imported.records.first();
+        auto next=model->document;
+        Record &active=next.records[activeRow()];
+        // Do not remap feature coordinates across insertions, rotations or reverse
+        // complements: these require alignment and validated coordinate transforms.
+        if(ungapped(source.sequence).toUpper()!=ungapped(active.sequence).toUpper())
+            throw std::runtime_error("The GenBank bases differ from the active sequence. No annotations were applied. Check length, origin rotation, orientation or variants first.");
+        if(source.features.isEmpty())
+            throw std::runtime_error("This GenBank record contains no supported simple-interval features. Complex joined features are not silently inferred.");
+        if(!active.features.isEmpty() &&
+           QMessageBox::question(this,"Replace annotations",
+               "The active sequence already has annotations. Replace them with the exact-sequence-matched GenBank features?",
+               QMessageBox::Yes|QMessageBox::No)!=QMessageBox::Yes)return;
+        active.features=source.features;
+        active.circular=source.circular;
+        next.warnings+=imported.warnings;
+        next.warnings.append("Feature labels imported from "+QFileInfo(path).fileName()+
+            " after exact nucleotide equality. Reverify biological function and provenance against the original source.");
+        commit(next,"Attach sequence-matched GenBank annotations");
+        statusBar()->showMessage(QString("Imported %1 source features onto the identical sequence.")
+            .arg(source.features.size()));
+    });
+}
 void Editor::addFeature(){if(busy())return;int row=activeRow(),len=ungapped(model->document.records[row].sequence).size();QDialog dlg(this);dlg.setWindowTitle("Add feature · ungapped coordinates");auto l=new QFormLayout(&dlg);auto name=new QLineEdit;auto start=new QSpinBox;start->setRange(1,len);auto end=new QSpinBox;end->setRange(1,len);end->setValue(qMin(30,len));auto rev=new QCheckBox("Reverse strand");l->addRow("Label",name);l->addRow("Start (1-based, inclusive)",start);l->addRow("End (inclusive)",end);l->addRow(rev);auto b=new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);l->addRow(b);connect(b,&QDialogButtonBox::accepted,&dlg,&QDialog::accept);connect(b,&QDialogButtonBox::rejected,&dlg,&QDialog::reject);if(dlg.exec()!=QDialog::Accepted)return;runSafely([&]{if(name->text().trimmed().isEmpty()||end->value()<start->value())throw std::runtime_error("Enter a label and an end at or after the start.");auto d=model->document;d.records[row].features.append(Feature{name->text().trimmed(),"misc_feature",start->value()-1,end->value(),rev->isChecked()});commit(d,"Add feature");});}
 void Editor::selectFeature(int idx){const auto &r=model->document.records[activeRow()];if(idx<0||idx>=r.features.size())return;auto f=r.features[idx];int ungap=0,left=-1,right=-1;for(int i=0;i<r.sequence.size();++i)if(r.sequence[i]!='-'){if(ungap==f.start)left=i;if(ungap==f.end-1)right=i;++ungap;}if(left<0||right<0)return;int row=activeRow();QItemSelection sel(model->index(row,left),model->index(row,right));table->selectionModel()->select(sel,QItemSelectionModel::ClearAndSelect);table->scrollTo(model->index(row,left));if(wrapped_)wrapped_->scrollToAlignmentColumn(left);tabs_->setCurrentIndex(1);}
 void Editor::showAnalysis(const QString &title,const QString &text){QDialog d(this);d.setWindowTitle(title);auto l=new QVBoxLayout(&d);auto view=new QPlainTextEdit;view->setReadOnly(true);view->setPlainText(text);l->addWidget(view);auto b=new QDialogButtonBox(QDialogButtonBox::Close);l->addWidget(b);connect(b,&QDialogButtonBox::rejected,&d,&QDialog::reject);d.resize(650,400);d.exec();}
