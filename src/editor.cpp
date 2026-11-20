@@ -918,14 +918,17 @@ Editor::Editor(bool preview):preview_(preview) {
     auto bar=addToolBar("Quick actions");
     bar->setObjectName("quickActions");
     bar->setMovable(false);
-    bar->setIconSize(QSize(17,17));
-    bar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    bar->setIconSize(QSize(16,16));
+    bar->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    bar->setMovable(false);
+    bar->setStyleSheet("QToolBar#quickActions{padding:1px 4px;spacing:2px;}"
+        "QToolBar#quickActions QToolButton{padding:2px 5px;min-height:20px;}");
     auto logo=new QLabel(bar);
     logo->setObjectName("brandIcon");
-    logo->setPixmap(qApp->windowIcon().pixmap(QSize(25,25)));
-    logo->setFixedSize(30,28);
+    logo->setPixmap(qApp->windowIcon().pixmap(QSize(21,21)));
+    logo->setFixedSize(25,24);
     bar->addWidget(logo);
-    auto brand=new QLabel("<b style='font-size:15px'>HelixEdit</b>  ");
+    auto brand=new QLabel("<b style='font-size:13px'>HelixEdit</b> ");
     bar->addWidget(brand);
     actOpen->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
     actSave->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
@@ -940,19 +943,40 @@ Editor::Editor(bool preview):preview_(preview) {
     pasteAction->setToolTip("Append FASTA records from the clipboard");
     copyAction->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
     pasteAction->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
+    actOpen->setToolTip("Open sequence / project (Ctrl+O)");
+    actSave->setToolTip("Save project (Ctrl+S)");
+    undo->setToolTip("Undo (Ctrl+Z)");redo->setToolTip("Redo");
     bar->addAction(actOpen);bar->addAction(actSave);bar->addSeparator();
     bar->addAction(undo);bar->addAction(redo);bar->addSeparator();
     bar->addAction(copyAction);bar->addAction(pasteAction);
     auto exampleButton=new QToolButton(bar);exampleButton->setText("Examples");
+    exampleButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
     exampleButton->setToolTip("Load attributed offline teaching sequences");
     exampleButton->setMenu(examplesMenu);exampleButton->setPopupMode(QToolButton::InstantPopup);
     bar->addWidget(exampleButton);
     auto addQuick=bar->addAction("+ Sequence",this,&Editor::addSequence);
+    addQuick->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
     addQuick->setToolTip("Add a DNA, RNA or protein record");
     auto spacer=new QWidget;spacer->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);
     bar->addWidget(spacer);
-    auto offline=new QLabel("<b style='color:#35ae98'>● LOCAL</b>   <span style='color:#8d9bac'>BETA</span>  ");
-    bar->addWidget(offline);
+    molecule_=new QComboBox(bar);
+    molecule_->setObjectName("compactMoleculeSelector");
+    molecule_->addItems({"DNA","RNA","Protein"});
+    molecule_->setToolTip("Molecule alphabet for the current project");
+    molecule_->setMaximumWidth(88);
+    bar->addWidget(molecule_);
+    search_=new QLineEdit(bar);
+    search_->setObjectName("quickSearch");
+    search_->setPlaceholderText("Find motif…");
+    search_->setToolTip("Find nucleotides or peptide motifs in the active record");
+    search_->setMaximumWidth(165);
+    bar->addWidget(search_);
+    auto find=new QPushButton("Find",bar);
+    find->setObjectName("quickFind");
+    find->setToolTip("Find next motif");
+    find->setMaximumWidth(53);
+    bar->addWidget(find);
+    bar->addSeparator();
     auto quickSettings=bar->addAction("Settings",this,&Editor::showSettings);
     quickSettings->setToolTip("All HelixEdit preferences · Ctrl+,");
     quickSettings->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
@@ -961,29 +985,31 @@ Editor::Editor(bool preview):preview_(preview) {
     quickUpdater->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
     auto root=new QWidget;setCentralWidget(root);
     auto layout=new QVBoxLayout(root);
-    layout->setContentsMargins(6,6,6,4);layout->setSpacing(5);
+    layout->setContentsMargins(4,3,4,3);layout->setSpacing(2);
     // Compact, category-based ribbon: each button triggers the existing menu action,
     // keeping keyboard shortcuts, enablement and behavior in one place.
     auto ribbon=new QTabWidget(root);
     ribbon->setObjectName("commandRibbon");
     ribbon->setDocumentMode(true);
-    ribbon->setMaximumHeight(79);
-    ribbon->setMinimumHeight(67);
+    ribbon->setMaximumHeight(55);
+    ribbon->setMinimumHeight(50);
+    ribbon->setStyleSheet("QTabWidget#commandRibbon QTabBar::tab{padding:2px 8px;}"
+        "QTabWidget#commandRibbon QToolButton{padding:2px 5px;margin:0;}");
     auto addRibbonCategory=[&](const QString &name,
                                const QVector<QPair<QString,QAction*>> &commands){
         auto page=new QWidget(ribbon);
         page->setObjectName("ribbonPage");
         auto row=new QHBoxLayout(page);
-        row->setContentsMargins(4,2,4,2);
-        row->setSpacing(2);
+        row->setContentsMargins(3,0,3,0);
+        row->setSpacing(1);
         for(const auto &command:commands){
             if(!command.second)continue;
             auto button=new QToolButton(page);
             button->setText(command.first);
             button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-            button->setIconSize(QSize(15,15));
-            button->setMinimumWidth(56);
-            button->setMaximumWidth(126);
+            button->setIconSize(QSize(13,13));
+            button->setMinimumWidth(0);
+            button->setMaximumWidth(112);
             button->setAutoRaise(true);
             button->setDefaultAction(command.second);
             button->setText(command.first);
@@ -1039,12 +1065,18 @@ Editor::Editor(bool preview):preview_(preview) {
     addRibbonCategory("Analysis",{{"MAFFT",mafftA},{"MUSCLE",muscleA},{"BLAST+",blastA},
                                   {"Consensus",consensusA},{"Matrix",matrixA},{"p-distance",distanceA},{"Statistics",statsA},{"PHYLIP",phyloA}});
     layout->addWidget(ribbon);
-    auto strip=new QHBoxLayout;auto title=new QLabel("<b style='font-size:14px'>Workspace</b>");strip->addWidget(title);strip->addStretch();
-    molecule_=new QComboBox;molecule_->addItems({"DNA","RNA","Protein"});molecule_->setToolTip("Verify molecule type; short proteins cannot always be inferred from letters.");strip->addWidget(molecule_);
-    search_=new QLineEdit;search_->setPlaceholderText("Find nucleotide or peptide motif…");search_->setMaximumWidth(260);strip->addWidget(search_);
-    auto find=new QPushButton("Find next");strip->addWidget(find);layout->addLayout(strip);
-    notice_=new QLabel;notice_->setObjectName("infoNotice");notice_->setWordWrap(false);
-    notice_->setMaximumHeight(25);notice_->setStyleSheet("background:#fff0d8;color:#86602b;border-radius:5px;padding:3px 8px;");layout->addWidget(notice_);
+    // Scientific import warnings remain accessible without covering the canvas.
+    notice_=new QLabel(statusBar());
+    notice_->setObjectName("warningStatusIndicator");
+    notice_->setMaximumWidth(145);
+    notice_->setToolTip("Document notices are also available from Help → Document notices…");
+    notice_->setStyleSheet("QLabel#warningStatusIndicator{background:transparent;"
+        "padding:0px 5px;font-size:11px;}");
+    statusBar()->addPermanentWidget(notice_);
+    auto offline=new QLabel("● LOCAL · BETA",statusBar());
+    offline->setObjectName("offlineStatus");
+    offline->setToolTip("Local-first HelixEdit beta; sequence data is not uploaded");
+    statusBar()->addPermanentWidget(offline);
     auto split=new QSplitter(Qt::Horizontal,root);layout->addWidget(split,1);
     tabs_=new QTabWidget;tabs_->setObjectName("studioTabs");tabs_->setDocumentMode(true);
     tabs_->setMovable(false);split->addWidget(tabs_);
