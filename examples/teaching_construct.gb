@@ -1,0 +1,13 @@
+LOCUS       teaching_construct        120 bp    DNA     circular
+DEFINITION  Synthetic illustrative sequence. Not a validated biological construct.
+FEATURES             Location/Qualifiers
+     regulatory      5..30
+                     /label="illustrative promoter"
+     CDS             40..81
+                     /label="illustrative fragment"
+     misc_feature    complement(90..110)
+                     /label="reverse feature"
+ORIGIN
+        1 atgaccgtac gttccgatgc tagctacgat cggatccgct aacgttagcg aattcggcat
+       61 cgtacgatga cctgactgac gatccgtacg gctagctacg ctagctagcg atcgtacgta
+//

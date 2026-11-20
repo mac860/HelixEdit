@@ -1,0 +1,2 @@
+# Optional converter only. The C++ desktop application does not require Python.
+biopython>=1.85,<2

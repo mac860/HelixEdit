@@ -1,1 +1,124 @@
 # HelixEdit
+
+**A compact, colourful, offline sequence studio for macOS Apple Silicon and Ubuntu ARM64.**
+
+Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
+
+**Status: 0.1.0 development preview.** The Linux x86_64 build and automated workflows are tested locally. Native macOS and Linux ARM64 build jobs are supplied; a successful job and target-device testing are required before calling those distributions verified. Full BioEdit feature parity is not claimed.
+
+![HelixEdit sequence map](docs/map.png)
+
+![HelixEdit alignment editor](docs/alignment.png)
+
+## Available now
+
+- Pastel nucleotide colours and grouped amino-acid colours, compact workspace, alignment/map/tools tabs.
+- On-demand alignment table with cell editing, rectangular selection, gap insertion, column deletion, FASTA block copy/paste, renaming, sequence removal and reverse complement.
+- Linear and circular maps, directional features, annotation addition, clickable feature-to-alignment selection, vector SVG export.
+- FASTA, CLUSTAL and limited GenBank import; FASTA and CLUSTAL export.
+- Atomic `.helix` projects retain sequences, molecule type, topology and supported features.
+- 30-change undo/redo, unsaved-change prompts, 30-second autosave and interrupted-session recovery.
+- Standard-code translation, majority consensus, aligned identity, canonical-base GC and four common restriction motifs.
+- Local asynchronous MAFFT 7 and MUSCLE 5 adapters with stable sequence IDs, input/output validation and undoable results.
+- Optional Biopython conversion script; no Python runtime is needed by the desktop app.
+
+## Build on Ubuntu (ARM64 or x86_64)
+
+Use packages for the architecture of the operating system you are running:
+
+```bash
+sudo apt update
+sudo apt install build-essential cmake qt6-base-dev qt6-svg-dev dpkg-dev
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel 2
+ctest --test-dir build --output-on-failure
+./build/helixedit
+```
+
+To create an architecture-native Debian package:
+
+```bash
+(cd build && cpack -G DEB)
+sudo apt install ./build/HelixEdit-*.deb
+```
+
+The `.deb` uses the distribution's Qt libraries; it does not bundle a browser, Python, alignment software or Qt itself. Package on the oldest Ubuntu release you intend to support. A package built on a newer release may require newer system libraries. The workflow builds on Ubuntu 24.04, including ARM64.
+
+## Build on Mac M1 / M2 / M3 / M4
+
+Install Apple's Command Line Tools and Homebrew first, then use native ARM Homebrew:
+
+```bash
+brew install cmake qt
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_PREFIX_PATH="$(brew --prefix qt)" \
+  -DCMAKE_OSX_ARCHITECTURES=arm64
+cmake --build build --parallel 2
+QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+open build/helixedit.app
+```
+
+For a self-contained Qt bundle:
+
+```bash
+"$(brew --prefix qt)/bin/macdeployqt" build/helixedit.app
+```
+
+The included workflow bundles Qt, ad-hoc signs the app and uploads a ZIP. It is **not Apple Developer ID signed or notarized**. Release distribution will require a signing identity and notarization. The minimum macOS version depends on the Qt package used; check Qt's supported-platform page before building for an older macOS.
+
+## Start a session
+
+1. Launch the app; the initial circular construct is explicitly synthetic teaching data.
+2. Open `examples/alignment.fasta`, `examples/protein.fasta` or `examples/teaching_construct.gb`.
+3. Verify the DNA/RNA/Protein selector. Character-based detection cannot distinguish all short proteins.
+4. Double-click a residue to replace it. Select a rectangular region for gap operations; row headers select rows. Reverse complement acts on selected rows.
+5. Use **Sequence map → + Feature** for ungapped, 1-based inclusive coordinates. Feature labels in the side panel select the matching alignment region.
+6. Save a `.helix` project. Sequence-only exports intentionally omit features and topology.
+
+Translation uses the entire active row, rejects gaps, uses the standard code and omits incomplete trailing codons. Find searches exact symbols in the active row; it does not interpret IUPAC wildcards or wrap across a circular origin. See [scientific rules and limitations](docs/ARCHITECTURE.md) before interpreting results.
+
+## Modern packages, optional
+
+```bash
+# Ubuntu; availability and architecture support depend on your repositories
+sudo apt install mafft muscle ncbi-blast+
+
+# macOS; use native ARM packages
+brew install mafft muscle blast
+```
+
+Open **Tools → Configure executables** to supply paths if PATH discovery fails. On Apple Silicon, `/opt/homebrew/bin` is checked for alignment executables. MUSCLE must be version 5; the old MUSCLE 3 command syntax is not used. BLAST+ has path configuration only in this version; a search UI is planned. Third-party programs are not bundled, automatically downloaded or installed.
+
+For sequence-only import from additional formats:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r scripts/requirements.txt
+python scripts/convert_sequences.py sample.ab1 sample.fasta --input-format abi
+python scripts/convert_sequences.py sample.dna sample.fasta --input-format snapgene
+python scripts/convert_sequences.py alignment.phy alignment.fasta --input-format phylip
+```
+
+The converter never overwrites an existing output. Keep original files: traces, quality values, annotations and topology are omitted from FASTA.
+
+## Build artifacts
+
+The **Build and test** GitHub Actions workflow builds Ubuntu x86_64, Ubuntu ARM64 and macOS ARM64 packages. Successful runs upload `.deb` files or a macOS app ZIP under the run's **Artifacts** section. Artifacts require GitHub sign-in for this private repository. ARM64 binaries are produced on ARM64 runners. CI artifacts are previews, not notarized releases.
+
+## Current boundaries
+
+No chromatogram viewer, BioEdit binary-project reader, direct `.dna` editor, rich GenBank round-trip, phylogenetic trees, molecular docking, multi-document workspace or alignment drag/slide yet. GenBank imports keep only simple feature locations and a few labels, with visible warnings for unsupported locations. The core remains small by leaving large analysis packages external. Actual memory and latency depend on dataset size; see the checked-in validation report for measured evidence.
+
+## Development
+
+```bash
+QT_QPA_PLATFORM=offscreen ./build/helixedit --screenshot alignment.png
+QT_QPA_PLATFORM=offscreen ./build/helixedit --screenshot map.png --map-preview
+```
+
+Automated tests cover all 64 standard codons, ambiguity/complement handling, parsers, coordinates, atomic project round-trips, aligned-output validation, editor undo/redo, gap edits, feature transforms and process-adapter acceptance/rejection. Fake aligners test adapter behaviour; they do not validate the scientific performance of MAFFT/MUSCLE.
+
+[Architecture](docs/ARCHITECTURE.md) · [Sources](docs/SOURCES.md) · [Validation](docs/VALIDATION.md)
+
+MIT license for HelixEdit's own code. Qt, Biopython and optional executables retain their respective licenses. Qt is dynamically linked; bundled distributions must preserve applicable notices and comply with Qt's licensing terms.

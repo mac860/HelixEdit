@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=HelixEdit
+Comment=Compact sequence and alignment studio
+Exec=helixedit %f
+Icon=helixedit
+Terminal=false
+Categories=Education;Science;Biology;
+Keywords=DNA;RNA;Protein;FASTA;Alignment;
+StartupNotify=true
