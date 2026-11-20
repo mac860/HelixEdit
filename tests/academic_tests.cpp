@@ -15,7 +15,7 @@ private slots:
   QVERIFY_EXCEPTION_THROWN(assembleOverlap("AAAA","AAAN",2),std::invalid_argument);
  }
  void matrix() {
-  Document d=parseFasta(">a\\nACGT\\n>b\\nACGA\\n>c\\nA-GA\\n");
+  Document d=parseFasta(">a\nACGT\n>b\nACGA\n>c\nA-GA\n");
   const auto m=pairwiseIdentityMatrix(d);
   QCOMPARE(m.size(),3);
   QCOMPARE(m[0][1],75.0);
