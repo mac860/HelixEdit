@@ -172,7 +172,7 @@ inline QString themeStyle(const QString &name) {
     const QString chrome=dracula?"rgba(48,39,76,236)"
         :(dark?"rgba(23,32,58,232)":"rgba(250,254,255,221)");
     const QString stroke=dracula?"#8153BC":(dark?"#42679D":"#8DBBF3");
-    const QString panel=dracula?"rgba(41,33,68,237)"
+    const QString glassPanel=dracula?"rgba(41,33,68,237)"
         :(dark?"rgba(23,33,58,236)":"rgba(251,252,255,237)");
     const QString focus=dracula?"#E3A1FF":(dark?"#48DCEC":"#007EEB");
     const QString softText=dark?"#DDE8FF":"#25466A";
@@ -282,7 +282,7 @@ inline QString themeStyle(const QString &name) {
         dark?(dracula?"#211B35":"#0E1628"):"#D7EDFF",
         dark?(dracula?"#2C2042":"#122945"):"#EDE3FF",
         dark?(dracula?"#153C42":"#102C33"):"#CFFAF2",
-        chrome,stroke,panel,focus,softText,
+        chrome,stroke,glassPanel,focus,softText,
         dark?"#B3C4E5":"#4F6787").arg(hoverFill);
 }
 inline void applyTheme(const QString &name) {
