@@ -50,20 +50,24 @@ LOCAL="$(git -C "$SOURCE" rev-parse HEAD)"
 REMOTE="$(git -C "$SOURCE" rev-parse refs/remotes/origin/main)"
 if [[ "$LOCAL" == "$REMOTE" ]]; then
   echo "HelixEdit source already up to date: ${LOCAL:0:12}"
-  exit 0
+  if [[ "$MODE" == --check ]]; then
+    exit 0
+  fi
+  echo "Rebuilding and reinstalling the current source; an installed binary may still be older."
+else
+  if ! git -C "$SOURCE" merge-base --is-ancestor "$LOCAL" "$REMOTE"; then
+    echo "Local and remote histories diverged. Manual review required; no reset." >&2;exit 2
+  fi
+  CHANGES="$(git -C "$SOURCE" rev-list --count "$LOCAL..$REMOTE")"
+  echo "Update available: $CHANGES commits (${LOCAL:0:12} -> ${REMOTE:0:12})"
+  git -C "$SOURCE" log --no-decorate --format='%h %s' "$LOCAL..$REMOTE" | head -n 25
+  if [[ "$MODE" == --check ]]; then
+    echo "Check complete. Select 'Update & install' to build, test and install."
+    exit 0
+  fi
+  echo "Fast-forwarding source (local files will not be reset)..."
+  git -C "$SOURCE" merge --ff-only "$REMOTE"
 fi
-if ! git -C "$SOURCE" merge-base --is-ancestor "$LOCAL" "$REMOTE"; then
-  echo "Local and remote histories diverged. Manual review required; no reset." >&2;exit 2
-fi
-CHANGES="$(git -C "$SOURCE" rev-list --count "$LOCAL..$REMOTE")"
-echo "Update available: $CHANGES commits (${LOCAL:0:12} -> ${REMOTE:0:12})"
-git -C "$SOURCE" log --no-decorate --format='%h %s' "$LOCAL..$REMOTE" | head -n 25
-if [[ "$MODE" == --check ]]; then
-  echo "Check complete. Select 'Update & install' to build, test and install."
-  exit 0
-fi
-echo "Fast-forwarding source (local files will not be reset)..."
-git -C "$SOURCE" merge --ff-only "$REMOTE"
 echo "Building and testing as user $(id -un)..."
 bash "$SOURCE/scripts/build_ubuntu_deb.sh"
 VERSION="$(sed -n 's/^project(HelixEdit VERSION \([0-9.]*\) .*/\1/p' "$SOURCE/CMakeLists.txt" | head -1)"
