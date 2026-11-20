@@ -32,9 +32,11 @@ inline QVector<RestrictionSite> findRestrictionSites(const Record &record) {
   const QString motif=entry.second;
   if(motif.size()>n)continue;
   const QString search=record.circular?seq+seq.left(motif.size()-1):seq;
+  const QStringView view(search);
+  const QStringView recognition(motif);
   for(int pos=0;pos<n;++pos) {
    if(!record.circular && pos+int(motif.size())>n)break;
-   if(search.mid(pos,motif.size())==motif)
+   if(view.mid(pos,motif.size())==recognition)
     result.append({entry.first,pos,pos+int(motif.size()),false});
   }
  }
