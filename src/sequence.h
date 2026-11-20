@@ -23,4 +23,5 @@ void validateDocument(const Document &doc);
 int width(const Document &doc);
 Document demo();
 Document acceptAlignment(const Document &original, const Document &aligned); // hx0... identifiers
+void attachExactGenBankAnnotations(Document &target,int recordIndex,const Document &annotatedSource); // strictly identical un-gapped strand and orientation
 }
