@@ -194,9 +194,9 @@ private slots:
         QVERIFY(map);
         const QString clipboardBefore=QGuiApplication::clipboard()->text();
         QGuiApplication::clipboard()->setText(">Addgene_NGS_Result\nAAAGAATTCTTT\n");
-        QAction *paste=nullptr;
-        for(auto *action:editor.findChildren<QAction*>())
-            if(action->text()=="Paste new FASTA records"){paste=action;break;}
+        // Toolbar shortens the shared QAction label to "Paste FASTA".
+        // Locate the action by its stable id, not a mutable visible label.
+        QAction *paste=editor.findChild<QAction*>("pasteFastaAction");
         QVERIFY(paste);
         const int oldCount=editor.model->rowCount();
         paste->trigger();
