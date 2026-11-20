@@ -44,26 +44,27 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir "$BUILD_DIR" --output-on-failure
   cd "$BUILD_DIR"
   cpack -G DEB --verbose
 )
-echo "Generated packages:"
-find "$BUILD_DIR" -maxdepth 1 -type f -name '*.deb' -print
-shopt -s nullglob
-packages=("$BUILD_DIR"/*.deb)
-if (( ${#packages[@]} == 0 )); then
-  echo "CPack reported success but no .deb was generated." >&2
-  exit 1
-fi
-for package in "${packages[@]}"; do
-  dpkg-deb --info "$package"
-  dpkg-deb --contents "$package" | grep -E '/usr/(bin/helixedit|share/applications/org.helixedit.desktop)' || {
-    echo "Package missing executable or desktop launcher: $package" >&2
-    exit 1
-  }
-done
-echo "Inspect with: dpkg-deb --info '$BUILD_DIR'/HelixEdit-*.deb"
 VERSION="$(sed -n 's/^project(HelixEdit VERSION \([0-9.]*\) .*/\1/p' "$ROOT/CMakeLists.txt" | head -1)"
 EXPECTED_PACKAGE="$BUILD_DIR/HelixEdit-$VERSION-$(uname -m).deb"
-if [[ -f "$EXPECTED_PACKAGE" ]]; then
-  echo "Install with: sudo apt install --reinstall '$EXPECTED_PACKAGE'"
-else
-  echo "Install with: sudo apt install <exact-package-path-from-the-list-above>"
+if [[ ! -f "$EXPECTED_PACKAGE" ]]; then
+  echo "CPack succeeded but the expected package is missing: $EXPECTED_PACKAGE" >&2
+  exit 1
 fi
+echo "Generated package: $EXPECTED_PACKAGE"
+dpkg-deb --info "$EXPECTED_PACKAGE"
+MANIFEST="$(dpkg-deb --contents "$EXPECTED_PACKAGE")"
+for required in \
+    '/usr/bin/helixedit' \
+    '/usr/share/applications/org.helixedit.desktop' \
+    '/usr/share/icons/hicolor/scalable/apps/helixedit.svg' \
+    '/usr/share/pixmaps/helixedit.svg' \
+    '/usr/share/helixedit/examples/samples/dna_orchid_6.fasta' \
+    '/usr/share/helixedit/scripts/update_from_source.sh'; do
+  if ! grep -Fq -- "$required" <<< "$MANIFEST"; then
+    echo "Required launcher, example or updater file missing: $required" >&2
+    exit 1
+  fi
+done
+echo "Launcher, icons, examples and updater are present in the package."
+echo "Inspect with: dpkg-deb --info '$EXPECTED_PACKAGE'"
+echo "Install with: sudo apt install --reinstall '$EXPECTED_PACKAGE'"
