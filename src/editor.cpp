@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <QPainterPath>
+#include <QPainterPathStroker>
 #ifdef Q_OS_UNIX
 #include <signal.h>
 #include <unistd.h>
@@ -66,7 +67,26 @@ bool AlignmentModel::setData(const QModelIndex &i,const QVariant &v,int role) {
     emit residueEdit(i.row(),i.column(),s[0]); return true;
 }
 void AlignmentModel::replace(const Document &d) {beginResetModel();document=d;columns_=helix::width(d);endResetModel();}
-static QColor featureColor(int i) { static const QStringList c={"#7c5ce7","#16a590","#f39c52","#e46d97","#408bd0"};return QColor(c[i%c.size()]); }
+static QColor featureColor(int i) {
+    static const QStringList colors={"#9661F8","#00D4A7","#FF9A3E","#FF5596","#25A9FF","#F5CB39"};
+    return QColor(colors[i%colors.size()]);
+}
+// Semantic colors use only the imported/manually supplied Feature type/name.
+// They do not infer biological identity from nucleotide sequence.
+static QColor featureColor(const Feature &feature,int fallbackIndex) {
+    const QString type=feature.type.toLower();
+    const QString name=feature.name.toLower();
+    if(type.contains("promoter")||name.contains("promoter"))return QColor("#9B5CFF");
+    if(type.contains("terminator")||name.contains("terminator"))return QColor("#FF7F3F");
+    if(type.contains("rep_origin")||type.contains("origin")||
+       name=="ori"||name.contains("origin"))return QColor("#FFD23D");
+    if(type.contains("cds")||type.contains("gene")||
+       name.contains("resistance")||name.contains("ampr")||
+       name.contains("puromycin"))return QColor("#00D0A5");
+    if(type.contains("primer")||name.contains("primer"))return QColor("#FF4FA1");
+    if(type.contains("regulatory")||name.contains("operator"))return QColor("#36B4FF");
+    return featureColor(fallbackIndex);
+}
 void MapView::paintEvent(QPaintEvent *) {QPainter p(this);draw(p,rect());}
 void MapView::draw(QPainter &p,const QRectF &bounds) const {
     p.save();
@@ -106,7 +126,7 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
             const auto &f=record.features[i];
             const qreal left=x+w*f.start/n,right=x+w*f.end/n, yy=y+56+(i%4)*29;
             if(right<=left)continue;
-            const QColor color=featureColor(i);
+            const QColor color=featureColor(f,i);
             const qreal tip=qMin<qreal>(9,(right-left)*.4);
             QPolygonF polygon;
             if(f.reverse)polygon<<QPointF(right,yy-7)<<QPointF(left+tip,yy-7)
@@ -164,33 +184,85 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
                 QString::number(j?int(n*j/8.):1));
         }
     }
-    if(showFeatures) {
+    if(showFeatures && !record.features.isEmpty()) {
+        // Full, vivid bands are drawn from zero-based, half-open GenBank feature
+        // coordinates. Distinct concentric lanes reduce overlap without
+        // fabricating or enlarging small biological intervals.
+        QVector<int> sorted;
+        sorted.reserve(record.features.size());
         for(int i=0;i<record.features.size();++i) {
             const auto &f=record.features[i];
-            if(f.end<=f.start)continue;
-            const QColor color=featureColor(i);
-            const double a=90.-360.*f.start/n;
-            const double span=-360.*(f.end-f.start)/n;
-            p.setPen(QPen(color,15,Qt::SolidLine,Qt::FlatCap));
-            p.drawArc(ring,int(a*16),int(span*16));
-            const double theta=(f.reverse?f.start:f.end)*2*M_PI/n-M_PI/2;
-            const QPointF radial(std::cos(theta),std::sin(theta));
-            QPointF tangent(-std::sin(theta),std::cos(theta));
-            if(f.reverse)tangent=-tangent;
-            const QPointF end=center+radial*radius;
-            p.setPen(Qt::NoPen);p.setBrush(color);
-            p.drawPolygon(QPolygonF{end+tangent*9,
-                end-tangent*6+radial*9,end-tangent*6-radial*9});
-            // On compact maps, prioritize legible sequence name over overlapping feature labels.
-            // All features are listed with complete names and coordinates in the Features tab.
-            if(radius>=205 && f.end-f.start>=n/8) {
+            if(f.start>=0 && f.end>f.start && f.end<=n)sorted.append(i);
+        }
+        std::sort(sorted.begin(),sorted.end(),[&](int left,int right){
+            return record.features[left].start<record.features[right].start;
+        });
+        const int laneCount=radius>=185?4:(radius>=135?3:(radius>=95?2:1));
+        QVector<int> laneEnd(laneCount,-1);
+        QPainterPathStroker bandStroker;
+        bandStroker.setWidth(radius>=135?16.0:12.0);
+        bandStroker.setCapStyle(Qt::FlatCap);
+        bandStroker.setJoinStyle(Qt::RoundJoin);
+        for(int i:sorted) {
+            const auto &f=record.features[i];
+            int lane=0;
+            for(int k=1;k<laneCount;++k)
+                if(laneEnd[k]<laneEnd[lane])lane=k;
+            // Prefer any lane not currently overlapping this feature.
+            for(int k=0;k<laneCount;++k)
+                if(laneEnd[k]<=f.start){lane=k;break;}
+            laneEnd[lane]=f.end;
+            const qreal trackRadius=qMax<qreal>(26,radius-13-lane*23);
+            const QRectF track(center.x()-trackRadius,center.y()-trackRadius,
+                               trackRadius*2,trackRadius*2);
+            const qreal startDeg=90.0-360.0*double(f.start)/n;
+            const qreal spanDeg=-360.0*double(f.end-f.start)/n;
+            const QColor color=featureColor(f,i);
+            QPainterPath arc;
+            arc.arcMoveTo(track,startDeg);
+            arc.arcTo(track,startDeg,spanDeg);
+            if(trackRadius*qAbs(spanDeg)*M_PI/180.0<3.0) {
+                // A tiny feature is represented as a dot at its actual
+                // midpoint, never by an artificially expanded coordinate arc.
+                const qreal theta=(f.start+(f.end-f.start)*0.5)*2*M_PI/n-M_PI/2;
+                p.setPen(QPen(color.darker(155),1));
+                p.setBrush(color);
+                p.drawEllipse(center+QPointF(std::cos(theta),std::sin(theta))*
+                              trackRadius,4.5,4.5);
+            } else {
+                const QPainterPath band=bandStroker.createStroke(arc);
+                p.fillPath(band,color);
+                p.setPen(QPen(color.darker(dark?118:146),0.8));
+                p.setBrush(Qt::NoBrush);
+                p.drawPath(band);
+                // Strand-aware arrowheads point along the genuine feature
+                // orientation. Only draw when the true arc can fit an arrow.
+                if(trackRadius*qAbs(spanDeg)*M_PI/180.0>19) {
+                    const double position=f.reverse?f.start:f.end;
+                    const double theta=position*2*M_PI/n-M_PI/2;
+                    const QPointF radial(std::cos(theta),std::sin(theta));
+                    QPointF tangent(-std::sin(theta),std::cos(theta));
+                    if(f.reverse)tangent=-tangent;
+                    const QPointF tip=center+radial*trackRadius+tangent*6;
+                    p.setPen(QPen(color.darker(135),0.8));
+                    p.setBrush(color.lighter(112));
+                    p.drawPolygon(QPolygonF{tip,
+                        tip-tangent*13+radial*6,
+                        tip-tangent*13-radial*6});
+                }
+            }
+            if(radius>=190 && f.end-f.start>=n/11) {
                 const qreal mid=(f.start+f.end)*M_PI/n-M_PI/2;
-                const QPointF midpoint=center+QPointF(std::cos(mid),std::sin(mid))*(radius-40);
+                const QPointF labelPoint=center+QPointF(std::cos(mid),std::sin(mid))*
+                    qMax<qreal>(20,trackRadius-16);
                 QFont labelFont=p.font();labelFont.setPointSize(8);labelFont.setBold(true);
-                p.setFont(labelFont);p.setPen(dark?QColor("#f2f2fb"):QColor("#2b3545"));
-                const qreal w=qMin<qreal>(95,f.name.size()*6+12);
-                p.drawText(QRectF(midpoint.x()-w/2,midpoint.y()-9,w,18),
-                    Qt::AlignCenter,QFontMetrics(labelFont).elidedText(f.name,Qt::ElideRight,int(w)));
+                p.setFont(labelFont);
+                p.setPen(foreground);
+                const qreal labelWidth=100;
+                p.drawText(QRectF(labelPoint.x()-labelWidth/2,labelPoint.y()-10,
+                                   labelWidth,20),Qt::AlignCenter,
+                    QFontMetrics(labelFont).elidedText(f.name,Qt::ElideRight,
+                                                        int(labelWidth)));
             }
         }
     }
@@ -229,7 +301,7 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
         const int midpoint=feature.start+(feature.end-feature.start)/2;
         const QString label=QString("%1  (%2–%3)")
             .arg(feature.name).arg(feature.start+1).arg(feature.end);
-        addCallout(label,midpoint,18,featureColor(i),true);
+        addCallout(label,midpoint,18,featureColor(feature,i),true);
     }
     int totalSiteCount=0,visibleSiteCount=0;
     if(showEnzymes && alphabet!="Protein") {
