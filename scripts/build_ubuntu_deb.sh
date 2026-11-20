@@ -59,7 +59,8 @@ for required in \
     '/usr/share/icons/hicolor/scalable/apps/helixedit.svg' \
     '/usr/share/pixmaps/helixedit.svg' \
     '/usr/share/helixedit/examples/samples/dna_orchid_6.fasta' \
-    '/usr/share/helixedit/scripts/update_from_source.sh'; do
+    '/usr/share/helixedit/scripts/update_from_source.sh' \
+    '/usr/share/helixedit/scripts/install_ubuntu_deb.sh'; do
   if ! grep -Fq -- "$required" <<< "$MANIFEST"; then
     echo "Required launcher, example or updater file missing: $required" >&2
     exit 1
@@ -67,4 +68,4 @@ for required in \
 done
 echo "Launcher, icons, examples and updater are present in the package."
 echo "Inspect with: dpkg-deb --info '$EXPECTED_PACKAGE'"
-echo "Install with: sudo apt install --reinstall '$EXPECTED_PACKAGE'"
+echo "Install without the _apt sandbox notice: bash scripts/install_ubuntu_deb.sh"
