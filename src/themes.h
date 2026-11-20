@@ -17,7 +17,7 @@ inline QString themeStyle(const QString &name) {
     const QString accent=name=="Dracula"?"#bd93f9":(dark?"#50cbb1":"#356fe4");
     const QString border=dark?"#40495a":"#d9e1ed";
     const QString hover=dark?"#3b4559":"#eaf1ff";
-    return QString(R"(
+    QString base=QString(R"(
       QWidget {font-family:"Inter","Noto Sans","Segoe UI","DejaVu Sans";font-size:12px;color:%3;background:%1;}
       QLabel,QCheckBox,QRadioButton {background:transparent;border:0;}
       QMainWindow,QDialog {background:%1;color:%3;}
@@ -62,6 +62,109 @@ inline QString themeStyle(const QString &name) {
       QScrollBar::add-line,QScrollBar::sub-line {width:0;height:0;}
       QToolTip {background:%2;color:%3;border:1px solid %5;padding:4px;}
     )").arg(bg,panel,text,muted,accent,border,hover);
+    if(dark)return base;
+    // Glass-inspired appearance uses alpha-blended panels and layered gradients.
+    // Native desktop background blur is not provided by Qt Widgets stylesheets.
+    return base+QStringLiteral(R"(
+      QMainWindow {
+        background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+            stop:0 #e9f4ff,stop:0.35 #faf8ff,stop:0.75 #f1faff,stop:1 #f9edff);
+      }
+      QMainWindow > QWidget {
+        background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+            stop:0 #edf7ff,stop:0.48 #fcfbff,stop:1 #edf5ff);
+      }
+      QMenuBar,QToolBar {
+        background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+            stop:0 rgba(255,255,255,250),stop:1 rgba(242,247,255,233));
+        color:#26364d;
+        border-bottom:1px solid #cbdcf2;
+      }
+      QStatusBar {background:rgba(249,252,255,244);border-top:1px solid #d7e4f5;}
+      QWidget#projectSidebar {
+        background:rgba(255,255,255,228);
+        border:1px solid rgba(151,177,227,160);
+        border-radius:15px;
+      }
+      QWidget#projectSidebar QLabel#sidebarHeading {color:#5c4ace;}
+      QTabWidget#studioTabs::pane {
+        background:rgba(255,255,255,234);
+        border:1px solid #cfdaf1;
+        border-radius:15px;
+      }
+      QTabWidget#commandRibbon::pane {
+        background:rgba(255,255,255,193);
+        border:1px solid rgba(138,175,227,140);
+        border-radius:12px;
+      }
+      QTabWidget#studioTabs QTabBar::tab {
+        background:rgba(235,244,255,200);
+        color:#526781;
+        padding:8px 13px;
+        border-top-left-radius:9px;
+        border-top-right-radius:9px;
+      }
+      QTabWidget#studioTabs QTabBar::tab:selected {
+        background:rgba(255,255,255,250);
+        color:#4d49bf;
+        border-bottom:3px solid #55beca;
+      }
+      QTabWidget#commandRibbon QTabBar::tab:selected {
+        background:rgba(101,104,234,40);
+        color:#4d49c4;
+        border-bottom:2px solid #7467ec;
+      }
+      QGroupBox {
+        background:rgba(255,255,255,227);
+        border:1px solid rgba(163,187,224,175);
+        border-radius:13px;
+        margin-top:11px;
+        padding:12px 8px 9px;
+      }
+      QGroupBox::title {color:#485f83;font-weight:700;}
+      QWidget#mapToolStrip {
+        background:rgba(237,247,255,218);
+        border:1px solid #d3e4f7;
+        border-radius:11px;
+      }
+      QToolButton,QPushButton {
+        background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+            stop:0 #ffffff,stop:1 #eff5ff);
+        border:1px solid #ccd9ee;
+        border-radius:9px;
+        color:#30486b;
+        padding:6px 10px;
+      }
+      QToolButton:hover,QPushButton:hover {
+        background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
+            stop:0 #ecfbff,stop:1 #ececff);
+        border-color:#6b8ce6;
+        color:#4943bf;
+      }
+      QToolButton:checked,QPushButton:checked {
+        background:rgba(94,218,201,68);
+        border-color:#42bba8;
+        color:#155a66;
+      }
+      QLineEdit,QComboBox,QPlainTextEdit,QListWidget,QTreeWidget,QTableView {
+        background:rgba(255,255,255,243);
+        border:1px solid #cfdcee;
+        border-radius:9px;
+        selection-background-color:#6478ec;
+        selection-color:#ffffff;
+      }
+      QHeaderView::section {
+        background:rgba(225,241,255,237);
+        color:#465d80;
+        border-bottom:1px solid #cbdbee;
+      }
+      QToolTip {
+        background:#ffffff;color:#233755;
+        border:1px solid #93b5ef;border-radius:8px;
+      }
+      QMenu {background:#ffffff;border:1px solid #d5e0f2;border-radius:9px;}
+      QMenu::item:selected {background:#e6f1ff;color:#3941a5;}
+    )");
 }
 inline void applyTheme(const QString &name) {
     qApp->setStyleSheet(themeStyle(name));
