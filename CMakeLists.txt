@@ -50,7 +50,7 @@ install(DIRECTORY examples/samples/ DESTINATION share/helixedit/examples/samples
 install(TARGETS helixedit BUNDLE DESTINATION . RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 if(UNIX AND NOT APPLE)
   install(FILES packaging/org.helixedit.desktop DESTINATION share/applications)
-  install(PROGRAMS scripts/update_from_source.sh DESTINATION share/helixedit/scripts)
+  install(PROGRAMS scripts/update_from_source.sh scripts/install_ubuntu_deb.sh DESTINATION share/helixedit/scripts)
   install(FILES packaging/helixedit.svg DESTINATION share/icons/hicolor/scalable/apps)
   install(FILES packaging/helixedit.svg DESTINATION share/pixmaps)
   configure_file(packaging/postinst.in "${CMAKE_CURRENT_BINARY_DIR}/postinst" COPYONLY)
