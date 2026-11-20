@@ -190,10 +190,28 @@ Editor::Editor(bool preview):preview_(preview) {
     edit->addAction("Paste new FASTA records",QKeySequence::Paste,this,[this]{if(busy())return;runSafely([&]{auto incoming=parseFasta(QGuiApplication::clipboard()->text());auto d=model->document;d.records+=incoming.records;commit(d,"Paste sequences");});});
     edit->addAction("Rename active sequence…",this,[this]{if(busy())return;bool ok=false;int row=activeRow();auto name=QInputDialog::getText(this,"Rename sequence","Name",QLineEdit::Normal,model->document.records[row].name,&ok);if(ok)runSafely([&]{auto d=model->document;d.records[row].name=name.trimmed();commit(d,"Rename sequence");});});
     edit->addAction("Remove selected sequences…",this,[this]{
-        if(busy())return;QSet<int> rows;for(const auto &range:table->selectionModel()->selection())for(int r=range.top();r<=range.bottom();++r)rows.insert(r);
-        if(rows.isEmpty()||rows.size()==model->document.records.size()){statusBar()->showMessage("Select rows to remove; keep at least one sequence.");return;}
-        if(QMessageBox::question(this,"Remove sequences","Remove the selected sequences from this document? Undo is available.")!=QMessageBox::Yes)return;
-        auto d=model->document;auto sorted=rows.values();std::sort(sorted.begin(),sorted.end(),std::greater<int>());for(int row:sorted)d.records.removeAt(row);commit(d,"Remove sequences");
+        if(busy())return;
+        QSet<int> rows;
+        for(const auto &range:table->selectionModel()->selection())
+            for(int r=range.top();r<=range.bottom();++r)rows.insert(r);
+        // A clicked residue may be the active sequence even without a selected row.
+        if(rows.isEmpty() && table->currentIndex().isValid())
+            rows.insert(table->currentIndex().row());
+        if(rows.isEmpty()){
+            QMessageBox::information(this,"Remove sequences","Select a sequence first.");return;
+        }
+        if(rows.size()>=model->document.records.size()){
+            QMessageBox::information(this,"Remove sequences",
+                "At least one sequence must remain in the current document.");return;
+        }
+        const QString message=QString("Remove %1 selected sequence(s)?\\n\\nThis can be undone.")
+                                  .arg(rows.size());
+        if(QMessageBox::question(this,"Remove sequences",message)!=QMessageBox::Yes)return;
+        auto d=model->document;
+        auto sorted=rows.values();
+        std::sort(sorted.begin(),sorted.end(),std::greater<int>());
+        for(int row:sorted)d.records.removeAt(row);
+        runSafely([&]{commit(d,"Remove sequences");});
     });
 
     edit->addAction("Insert gap at selected column",QKeySequence("Ctrl+I"),this,[this]{gapColumns(true);});
@@ -255,9 +273,29 @@ Editor::Editor(bool preview):preview_(preview) {
     ribbon->setDocumentMode(true);
     ribbon->setMaximumHeight(112);
     ribbon->setMinimumHeight(92);
+    ribbon->setStyleSheet(
+        "QTabWidget#commandRibbon::pane {border:1px solid rgba(148,120,210,100);"
+        "border-radius:13px;background:rgba(139,104,218,25);}"
+        "QTabWidget#commandRibbon QTabBar::tab {padding:7px 17px;margin-right:3px;"
+        "border:1px solid rgba(142,125,193,70);border-radius:9px;"
+        "background:rgba(130,110,180,30);font-weight:600;}"
+        "QTabWidget#commandRibbon QTabBar::tab:selected {"
+        "background:rgba(138,103,226,90);border:1px solid rgba(138,103,226,140);}"
+        "QTabWidget#commandRibbon QToolButton {border:1px solid rgba(160,140,200,70);"
+        "border-radius:11px;padding:5px 8px;background:rgba(255,255,255,30);}"
+        "QTabWidget#commandRibbon QToolButton:hover {"
+        "background:rgba(125,103,224,100);border:1px solid rgba(125,103,224,170);}"
+        "QTabWidget#commandRibbon QToolButton:pressed {background:rgba(95,74,195,130);}"
+    );
     auto addRibbonCategory=[&](const QString &name,
                                const QVector<QPair<QString,QAction*>> &commands){
         auto page=new QWidget(ribbon);
+        page->setObjectName("ribbonPage");
+        const QString tint=name=="Home"?"rgba(46,174,221,35)":
+            name=="Sequence"?"rgba(39,202,144,35)":
+            name=="Plasmid"?"rgba(231,120,177,38)":"rgba(166,115,244,38)";
+        page->setStyleSheet("QWidget#ribbonPage {background:"+tint+
+                            ";border-radius:11px;}");
         auto row=new QHBoxLayout(page);
         row->setContentsMargins(8,4,8,4);
         row->setSpacing(6);
@@ -272,7 +310,7 @@ Editor::Editor(bool preview):preview_(preview) {
             button->setAutoRaise(true);
             button->setDefaultAction(command.second);
             button->setText(command.first);
-            button->setToolTip(command.second->text()+"\\n"+command.second->toolTip());
+            button->setToolTip(command.second->text()+"\n"+command.second->toolTip());
             row->addWidget(button);
         }
         row->addStretch(1);
@@ -296,6 +334,8 @@ Editor::Editor(bool preview):preview_(preview) {
     auto saveA=actionFor(fileMenu,"Save project",QStyle::SP_DialogSaveButton);
     auto exportA=actionFor(fileMenu,"Export FASTA / CLUSTAL…",QStyle::SP_DialogSaveButton);
     auto addA=actionFor(edit,"Add sequence…",QStyle::SP_FileIcon);
+    auto renameA=actionFor(edit,"Rename active sequence…",QStyle::SP_FileDialogDetailedView);
+    auto removeA=actionFor(edit,"Remove selected sequences…",QStyle::SP_TrashIcon);
     auto reverseA=actionFor(edit,"Reverse complement selected rows",QStyle::SP_BrowserReload);
     auto gapA=actionFor(edit,"Insert gap at selected column",QStyle::SP_ArrowRight);
     auto translateA=actionFor(analysis,"Translate active sequence…",QStyle::SP_MediaPlay);
@@ -311,7 +351,7 @@ Editor::Editor(bool preview):preview_(preview) {
     setRibbonIcon(redo,QStyle::SP_ArrowForward);
     addRibbonCategory("Home",{{"Open",openA},{"Save",saveA},
                               {"Undo",undo},{"Redo",redo},{"Export",exportA}});
-    addRibbonCategory("Sequence",{{"Add sequence",addA},{"Insert gap",gapA},
+    addRibbonCategory("Sequence",{{"Add",addA},{"Rename",renameA},{"Remove",removeA},{"Insert gap",gapA},
                                   {"Reverse",reverseA},{"Translate",translateA},{"Find ORFs",orfA}});
     addRibbonCategory("Plasmid",{{"Addgene ID",addgeneA},{"Import GenBank",importA},
                                  {"Restriction",restrictA}});
