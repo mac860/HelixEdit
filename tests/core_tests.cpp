@@ -57,6 +57,38 @@ private slots:
         auto f=d.records[0].features[0];QCOMPARE(f.start,1);QCOMPARE(f.end,9);QVERIFY(f.reverse);QCOMPARE(f.name,QString("rev"));QVERIFY(d.warnings.join(" ").contains("Unsupported"));
         input.replace("12 bp","13 bp");QVERIFY_EXCEPTION_THROWN(parseGenBank(input),std::runtime_error);
     }
+    void fastaTopologyRequiresVerification() {
+        auto d=parseFasta(">Addgene_NGS_Result\nGGCGCTCTTCCGCTTCCTCGCTCACTGACTCGCTGCGCTCGGTCGTTCGGCTGCGGCGAGCGGTATCAGCTCACTCAAAGGCGGTAATACGGTTATCCACAGAATCAGGGGATAACGCAGGAAAGAACATG\n");
+        QCOMPARE(d.records.size(),1);
+        QVERIFY(!d.records.first().circular);
+        QVERIFY(d.records.first().features.isEmpty());
+        QVERIFY(d.warnings.join(" ").contains("FASTA carries no topology"));
+    }
+    void strictlySequenceMatchedAnnotationImport() {
+        auto target=parseFasta(">Addgene_NGS_Result\nACGCGTGAATTCGGGCTAGC\n");
+        const QString genbankText=
+            "LOCUS       verified 20 bp DNA circular\n"
+            "FEATURES             Location/Qualifiers\n"
+            "     promoter        3..10\n"
+            "                     /label=\"Verified donor feature\"\n"
+            "ORIGIN\n"
+            "        1 acgcgtgaattcgggctagc\n"
+            "//\n";
+        auto donor=parseGenBank(genbankText);
+        QVERIFY(donor.records.first().circular);
+        attachExactGenBankAnnotations(target,0,donor);
+        QVERIFY(target.records.first().circular);
+        QCOMPARE(target.records.first().features.size(),1);
+        QCOMPARE(target.records.first().features[0].name,QString("Verified donor feature"));
+        QCOMPARE(target.records.first().features[0].start,2);
+        QCOMPARE(target.records.first().features[0].end,10);
+        auto mismatched=parseFasta(">variant\nACGCGTGAATTCGGGCTAGT\n");
+        QVERIFY_EXCEPTION_THROWN(attachExactGenBankAnnotations(mismatched,0,donor),std::runtime_error);
+        QVERIFY(mismatched.records.first().features.isEmpty());
+        QVERIFY(!mismatched.records.first().circular);
+        auto rotated=parseFasta(">rotated\nCGTGAATTCGGGCTAGCACG\n");
+        QVERIFY_EXCEPTION_THROWN(attachExactGenBankAnnotations(rotated,0,donor),std::runtime_error);
+    }
     void projectRoundTrip() {
         QTemporaryDir tmp;auto d=demo();d.records[0].name="Δ construct";auto path=tmp.filePath("round.helix");writeProject(path,d);auto out=readDocument(path);
         QCOMPARE(out.records[0].name,d.records[0].name);QVERIFY(out.records[0].circular);QCOMPARE(out.records[0].features[1].end,260);
