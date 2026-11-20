@@ -226,16 +226,6 @@ Editor::Editor(bool preview):preview_(preview) {
     setWindowTitle("HelixEdit");resize(1260,780);setMinimumSize(900,600);
     model=new AlignmentModel(this);history=new QUndoStack(this);history->setUndoLimit(30);
     applyTheme(savedTheme());
-    auto appearance=menuBar()->addMenu("&Appearance");
-    auto themeGroup=new QActionGroup(this);
-    themeGroup->setExclusive(true);
-    for(const QString &theme : {QString("Light"),QString("Dark"),QString("Dracula")}) {
-        auto action=appearance->addAction(theme);
-        action->setCheckable(true);
-        action->setChecked(theme==savedTheme());
-        themeGroup->addAction(action);
-        connect(action,&QAction::triggered,this,[this,theme]{applyTheme(theme);if(map_)map_->update();});
-    }
     auto fileMenu=menuBar()->addMenu("&File");
     fileMenu->addAction("New project / workspace…",QKeySequence::New,this,[this]{
         if(busy())return;
@@ -635,11 +625,41 @@ Editor::Editor(bool preview):preview_(preview) {
             "\n\nHistory path: "+path+
             "\nOnly the last 1 MiB is displayed; the complete file remains on disk.");
     });
-    tools->addAction("Configure executables…",this,&Editor::toolSettings);
+    auto settingsMenu=menuBar()->addMenu("&Settings");
+    auto settingsAction=settingsMenu->addAction("Preferences…",this,&Editor::showSettings);
+    settingsAction->setObjectName("openSettings");
+    settingsAction->setShortcut(QKeySequence("Ctrl+,"));
+    settingsMenu->addAction("Update from GitHub source…",this,[this]{openSourceUpdater(this);});
     auto help=menuBar()->addMenu("&Help");
-    help->addAction("Check / update from GitHub source…",this,[this]{openSourceUpdater(this);});
-    help->addSeparator();
-    help->addAction("About HelixEdit",this,[this]{QMessageBox::about(this,"HelixEdit 0.1.3 beta","Independent, offline sequence editor.\nOriginal implementation inspired by familiar sequence workflows.\nNot affiliated with BioEdit or SnapGene.\n\nDevelopment preview: verify results before research use.\nSee README for format and analysis limitations.");});
+    help->addAction("About HelixEdit",this,[this]{
+        QDialog dialog(this);
+        dialog.setObjectName("helixAboutDialog");
+        dialog.setWindowTitle("About HelixEdit");
+        dialog.setMinimumWidth(475);
+        auto layout=new QVBoxLayout(&dialog);
+        layout->setSpacing(12);
+        auto heading=new QLabel("<span style='font-size:23px;font-weight:700'>⬡ HelixEdit</span>   "
+            "<span style='font-size:12px'>"+QCoreApplication::applicationVersion()+" beta</span>");
+        layout->addWidget(heading);
+        auto description=new QLabel("Compact, offline-first DNA, RNA, protein and plasmid sequence studio.");
+        description->setWordWrap(true);layout->addWidget(description);
+        auto credit=new QLabel("<b>Developed and edited by Wael H</b><br>"
+            "Contact: <a href='mailto:waelye@gmail.com'>waelye@gmail.com</a><br>"
+            "GitHub repository: <a href='https://github.com/mac860/HelixEdit'>"
+            "https://github.com/mac860/HelixEdit</a>");
+        credit->setTextFormat(Qt::RichText);
+        credit->setTextInteractionFlags(Qt::TextBrowserInteraction);
+        credit->setOpenExternalLinks(true);
+        credit->setWordWrap(true);layout->addWidget(credit);
+        auto disclaimer=new QLabel("Independent open-source beta, not affiliated with BioEdit or "
+            "SnapGene. Validate scientific analyses before research use. "
+            "No proprietary third-party application assets are included.");
+        disclaimer->setWordWrap(true);layout->addWidget(disclaimer);
+        auto buttons=new QDialogButtonBox(QDialogButtonBox::Close);
+        connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
+        layout->addWidget(buttons);
+        dialog.exec();
+    });
     auto bar=addToolBar("Quick actions");
     bar->setObjectName("quickActions");
     bar->setMovable(false);
@@ -742,7 +762,6 @@ Editor::Editor(bool preview):preview_(preview) {
     auto blastA=actionFor(tools,"BLAST+ against local database…",QStyle::SP_FileDialogContentsView);
     auto mafftA=actionFor(tools,"Align with MAFFT",QStyle::SP_BrowserReload);
     auto muscleA=actionFor(tools,"Align with MUSCLE 5",QStyle::SP_BrowserReload);
-    auto configA=actionFor(tools,"Configure executables…",QStyle::SP_FileDialogDetailedView);
     auto addgeneA=actionFor(addgeneMenu,"Find plasmid by Addgene ID…",QStyle::SP_DirLinkIcon);
     auto importA=actionFor(addgeneMenu,"Import Addgene GenBank into project…",QStyle::SP_DialogOpenButton);
     setRibbonIcon(undo,QStyle::SP_ArrowBack);
@@ -752,7 +771,7 @@ Editor::Editor(bool preview):preview_(preview) {
     addRibbonCategory("Plasmid",{{"Addgene ID",addgeneA},{"Import GenBank",importA},
                                  {"Restriction",restrictA},{"Export GB",gbExportA},{"Assemble",assemblyA}});
     addRibbonCategory("Analysis",{{"MAFFT",mafftA},{"MUSCLE",muscleA},{"BLAST+",blastA},
-                                  {"Consensus",consensusA},{"Matrix",matrixA},{"p-distance",distanceA},{"Statistics",statsA},{"PHYLIP",phyloA},{"Tool settings",configA}});
+                                  {"Consensus",consensusA},{"Matrix",matrixA},{"p-distance",distanceA},{"Statistics",statsA},{"PHYLIP",phyloA}});
     layout->addWidget(ribbon);
     auto strip=new QHBoxLayout;auto title=new QLabel("<b style='font-size:14px'>Workspace</b>");strip->addWidget(title);strip->addStretch();
     molecule_=new QComboBox;molecule_->addItems({"DNA","RNA","Protein"});molecule_->setToolTip("Verify molecule type; short proteins cannot always be inferred from letters.");strip->addWidget(molecule_);
@@ -924,7 +943,7 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     auto toolPage=new QWidget;auto tl=new QVBoxLayout(toolPage);auto th=new QLabel("<b style='font-size:19px'>Bring your own tools.</b><br><br>Native editor. Optional local packages. No sequence uploads.<br>MAFFT and MUSCLE 5 run as background jobs; output is checked before applying.");th->setWordWrap(true);tl->addWidget(th);
     for(auto name:QStringList{"mafft","muscle"}){auto b=new QPushButton("Align document with "+name.toUpper());tl->addWidget(b);connect(b,&QPushButton::clicked,this,[this,name]{align(name);});}
     auto cancel=new QPushButton("Cancel running alignment");tl->addWidget(cancel);connect(cancel,&QPushButton::clicked,this,&Editor::cancelAlignment);
-    auto cfg=new QPushButton("Configure package paths…");tl->addWidget(cfg);connect(cfg,&QPushButton::clicked,this,&Editor::toolSettings);
+    auto cfg=new QPushButton("Configure scientific tools in Settings…");tl->addWidget(cfg);connect(cfg,&QPushButton::clicked,this,&Editor::showSettings);
     log_=new QPlainTextEdit;log_->setObjectName("alignerLog");log_->setReadOnly(true);log_->setPlaceholderText("Job logs appear here. No alignment tools are bundled.");tl->addWidget(log_,1);
     tabs_->addTab(toolPage,"03  Local tools");
     // Map-first scientific navigation. Each page invokes existing, real algorithms.
@@ -1268,7 +1287,7 @@ void Editor::align(const QString &tool){
 #ifdef Q_OS_MACOS
     if(exe.isEmpty()&&QFileInfo::exists("/opt/homebrew/bin/"+tool))exe="/opt/homebrew/bin/"+tool;
 #endif
-    if(exe.isEmpty()||!QFileInfo(exe).isExecutable()){QMessageBox::information(this,"Package not found","Install "+tool+" for your architecture, then configure its executable path under Tools.");return;}
+    if(exe.isEmpty()||!QFileInfo(exe).isExecutable()){QMessageBox::information(this,"Package not found","Install "+tool+" for your architecture, then configure its executable path under Settings → Preferences.");return;}
     auto original=model->document;Document input=original;
     for(int i=0;i<input.records.size();++i){input.records[i].name="hx"+QString::number(i);input.records[i].sequence=ungapped(input.records[i].sequence);if(input.records[i].sequence.isEmpty()){QMessageBox::information(this,"Alignment","An all-gap row cannot be aligned.");return;}}
     temp_=std::make_unique<QTemporaryDir>();if(!temp_->isValid()){QMessageBox::warning(this,"Alignment","Cannot create job directory.");return;}
