@@ -953,6 +953,9 @@ Editor::Editor(bool preview):preview_(preview) {
     actSave->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
     undo->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
     redo->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
+    // Stable ids are independent from compact menu/toolbar labels.
+    copyAction->setObjectName("copyFastaAction");
+    pasteAction->setObjectName("pasteFastaAction");
     copyAction->setText("Copy FASTA");
     copyAction->setToolTip("Copy the selected alignment rectangle as sequence-only FASTA");
     pasteAction->setText("Paste FASTA");
