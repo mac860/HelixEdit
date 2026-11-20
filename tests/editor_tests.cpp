@@ -186,6 +186,53 @@ private slots:
             found |= action->text().contains("update from GitHub source",Qt::CaseInsensitive);
         QVERIFY(found);
     }
+    void wrapToWindowReflowsAndPreservesEditableSequence() {
+        Editor e(true);
+        auto view=e.findChild<WrappedSequenceView*>("wrappedSequenceView");
+        auto wrap=e.findChild<QCheckBox*>("wrapToWindow");
+        auto complement=e.findChild<QCheckBox*>("showComplement");
+        auto featureTracks=e.findChild<QCheckBox*>("showWrappedFeatures");
+        auto stack=e.findChild<QStackedWidget*>("sequenceViewStack");
+        QVERIFY(view);QVERIFY(wrap);QVERIFY(complement);QVERIFY(featureTracks);QVERIFY(stack);
+        auto doc=parseFasta(">plasmid\nACGTRYSWKMBDHVN-ATGCTGAACCTG\n");
+        doc.records[0].features.append(
+            Feature{"test_feature","misc_feature",4,24,false});
+        e.setDocument(doc);
+        const QString original=e.model->document.records[0].sequence;
+        auto tabs=e.findChild<QTabWidget*>("studioTabs");
+        QVERIFY(tabs);
+        tabs->setCurrentIndex(1);
+        wrap->setChecked(true);
+        QCOMPARE(stack->currentIndex(),1);
+        WrappedSequenceView isolated;
+        isolated.resize(850,390);
+        isolated.setRecord(doc.records[0],"DNA");
+        isolated.show();
+        QCoreApplication::processEvents();
+        const int wide=isolated.basesPerLine();
+        isolated.resize(350,390);
+        QCoreApplication::processEvents();
+        const int narrow=isolated.basesPerLine();
+        QVERIFY2(wide>narrow,"A narrower viewport must wrap into fewer bases per line");
+        QVERIFY(narrow>=10);
+        complement->setChecked(false);
+        QVERIFY(!view->showComplement());
+        complement->setChecked(true);
+        QVERIFY(view->showComplement());
+        featureTracks->setChecked(false);
+        QVERIFY(!view->showFeatures());
+        featureTracks->setChecked(true);
+        QVERIFY(view->showFeatures());
+        const int hit=isolated.alignmentColumnAt(QPoint(65,56));
+        QVERIFY(hit>=0);
+        QVERIFY(hit<original.size());
+        isolated.setSelectedColumn(hit);
+        QCOMPARE(isolated.selectedColumn(),hit);
+        wrap->setChecked(false);
+        QCOMPARE(stack->currentIndex(),0);
+        QCOMPARE(e.model->document.records[0].sequence,original);
+        QCOMPARE(stack->currentWidget(),static_cast<QWidget*>(e.table));
+    }
     void compactWorkspaceAndNavigator() {
         Editor editor(true);
         auto studio=editor.findChild<QTabWidget*>("studioTabs");
