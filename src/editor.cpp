@@ -208,6 +208,20 @@ Editor::Editor(bool preview):preview_(preview) {
         });
     });
     fileMenu->addAction("Export FASTA / CLUSTAL…",this,&Editor::exportFile);
+    fileMenu->addAction("Export annotated GenBank…",this,[this]{
+        const QString path=QFileDialog::getSaveFileName(this,"Export GenBank",{},"GenBank (*.gb)");
+        if(path.isEmpty())return;
+        runSafely([&]{
+            const QString output=genbank(model->document);
+            const QString destination=path.endsWith(".gb",Qt::CaseInsensitive)?path:path+".gb";
+            QSaveFile file(destination);
+            const QByteArray bytes=output.toUtf8();
+            if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit())
+                throw std::runtime_error("Failed to write GenBank file.");
+            statusBar()->showMessage("Exported annotated GenBank: "+destination);
+        });
+    });
+
     fileMenu->addAction("Export map as SVG…",this,[this]{auto p=QFileDialog::getSaveFileName(this,"Export vector map",{},"SVG (*.svg)");if(!p.isEmpty())runSafely([&]{exportMap(p);});});
     fileMenu->addAction("Load teaching demo",this,[this]{if(canReplace())setDocument(demo());});
     fileMenu->addSeparator();fileMenu->addAction("Quit",QKeySequence::Quit,this,&QWidget::close);
@@ -367,6 +381,7 @@ Editor::Editor(bool preview):preview_(preview) {
     auto openA=actionFor(fileMenu,"Open…",QStyle::SP_DialogOpenButton);
     auto saveA=actionFor(fileMenu,"Save project",QStyle::SP_DialogSaveButton);
     auto exportA=actionFor(fileMenu,"Export FASTA / CLUSTAL…",QStyle::SP_DialogSaveButton);
+    auto gbExportA=actionFor(fileMenu,"Export annotated GenBank…",QStyle::SP_DialogSaveButton);
     auto addA=actionFor(edit,"Add sequence…",QStyle::SP_FileIcon);
     auto renameA=actionFor(edit,"Rename active sequence…",QStyle::SP_FileDialogDetailedView);
     auto removeA=actionFor(edit,"Remove selected sequences…",QStyle::SP_TrashIcon);
@@ -388,7 +403,7 @@ Editor::Editor(bool preview):preview_(preview) {
     addRibbonCategory("Sequence",{{"Add",addA},{"Rename",renameA},{"Remove",removeA},{"Insert gap",gapA},
                                   {"Reverse",reverseA},{"Translate",translateA},{"Find ORFs",orfA}});
     addRibbonCategory("Plasmid",{{"Addgene ID",addgeneA},{"Import GenBank",importA},
-                                 {"Restriction",restrictA}});
+                                 {"Restriction",restrictA},{"Export GB",gbExportA}});
     addRibbonCategory("Analysis",{{"MAFFT",mafftA},{"MUSCLE",muscleA},
                                   {"Consensus",consensusA},{"ORFs",orfA},{"Tool settings",configA}});
     layout->addWidget(ribbon);
