@@ -995,10 +995,10 @@ Editor::Editor(bool preview):preview_(preview) {
 
     auto activityRail=new QFrame(root);
     activityRail->setObjectName("activityRail");
-    activityRail->setFixedWidth(75);
+    activityRail->setFixedWidth(56);
     auto activityLayout=new QVBoxLayout(activityRail);
-    activityLayout->setContentsMargins(4,9,4,7);
-    activityLayout->setSpacing(8);
+    activityLayout->setContentsMargins(4,7,4,6);
+    activityLayout->setSpacing(7);
     auto activityGroup=new QButtonGroup(activityRail);
     activityGroup->setExclusive(true);
     auto iconForMode=[](const QString &glyph,const QColor &color){
@@ -1029,42 +1029,55 @@ Editor::Editor(bool preview):preview_(preview) {
         button->setProperty("workspaceRole",role);
         button->setCheckable(true);
         button->setAutoRaise(false);
-        button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+        button->setToolButtonStyle(Qt::ToolButtonIconOnly);
         button->setIcon(iconForMode(glyph,color));
-        button->setIconSize(QSize(35,35));
+        button->setIconSize(QSize(34,34));
         button->setText(title);
+        button->setAccessibleName(title+" workspace");
         button->setToolTip(title+" workspace");
-        button->setFixedSize(65,69);
+        button->setFixedSize(46,48);
         activityGroup->addButton(button);
         activityLayout->addWidget(button);
         return button;
     };
+    // ChatGPT-like sidebar toggle: a single icon in the first row, backed by
+    // a keyboard shortcut and a persisted preference. The activity rail stays.
+    auto toggleTools=new QToolButton(activityRail);
+    toggleTools->setObjectName("toggleWorkspaceTools");
+    toggleTools->setIcon(style()->standardIcon(QStyle::SP_ArrowRight));
+    toggleTools->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    toggleTools->setIconSize(QSize(19,19));
+    toggleTools->setAccessibleName("Toggle tools sidebar");
+    toggleTools->setCheckable(true);
+    toggleTools->setChecked(QSettings("HelixEdit","HelixEdit")
+        .value("workspace/toolPanelVisible",false).toBool());
+    toggleTools->setFixedSize(46,43);
+    toggleTools->setToolTip("Show/hide tools sidebar  ·  Ctrl+Shift+S");
+    activityLayout->addWidget(toggleTools);
+    auto railDivider=new QFrame(activityRail);
+    railDivider->setObjectName("activityRailDivider");
+    railDivider->setFrameShape(QFrame::HLine);
+    railDivider->setFixedHeight(5);
+    activityLayout->addWidget(railDivider);
     auto activitySequence=addActivity("Sequence","AT","sequence",QColor("#009CF5"));
     auto activityPlasmid=addActivity("Plasmid","◉","plasmid",QColor("#A34CFA"));
     auto activityAnalysis=addActivity("Analysis","Σ","analysis",QColor("#04B888"));
     activityLayout->addStretch(1);
-    auto toggleTools=new QToolButton(activityRail);
-    toggleTools->setObjectName("toggleWorkspaceTools");
-    toggleTools->setIcon(style()->standardIcon(QStyle::SP_ToolBarHorizontalExtensionButton));
-    toggleTools->setIconSize(QSize(20,20));
-    toggleTools->setCheckable(true);
-    toggleTools->setChecked(true);
-    toggleTools->setFixedSize(65,37);
-    toggleTools->setToolTip("Show or hide the workspace tools panel");
-    activityLayout->addWidget(toggleTools);
     auto toggleProject=new QToolButton(activityRail);
     toggleProject->setObjectName("toggleProjectExplorer");
     toggleProject->setIcon(style()->standardIcon(QStyle::SP_DirHomeIcon));
     toggleProject->setToolButtonStyle(Qt::ToolButtonIconOnly);
     toggleProject->setToolTip("Show or hide the sequence/project explorer");
     toggleProject->setCheckable(true);
-    toggleProject->setFixedSize(65,37);
+    toggleProject->setAccessibleName("Toggle project explorer");
+    toggleProject->setIconSize(QSize(18,18));
+    toggleProject->setFixedSize(46,43);
     activityLayout->addWidget(toggleProject);
     workspaceRow->addWidget(activityRail);
 
     auto toolPanel=new QFrame(root);
     toolPanel->setObjectName("workspaceToolPanel");
-    toolPanel->setFixedWidth(194);
+    toolPanel->setFixedWidth(188);
     toolPanel->setProperty("activeWorkspace","sequence");
     auto toolPanelLayout=new QVBoxLayout(toolPanel);
     toolPanelLayout->setContentsMargins(7,10,7,8);
@@ -1080,6 +1093,14 @@ Editor::Editor(bool preview):preview_(preview) {
     toolPanelLayout->addWidget(contextStack,1);
     workspaceRow->addWidget(toolPanel);
     connect(toggleTools,&QToolButton::toggled,toolPanel,&QWidget::setVisible);
+    connect(toggleTools,&QToolButton::toggled,this,[toggleTools](bool shown){
+        QSettings("HelixEdit","HelixEdit").setValue("workspace/toolPanelVisible",shown);
+        toggleTools->setIcon(qApp->style()->standardIcon(
+            shown?QStyle::SP_ArrowLeft:QStyle::SP_ArrowRight));
+    });
+    toolPanel->setVisible(toggleTools->isChecked());
+    toggleTools->setIcon(style()->standardIcon(toggleTools->isChecked()
+        ?QStyle::SP_ArrowLeft:QStyle::SP_ArrowRight));
 
     QVector<QVBoxLayout*> contextLayouts;
     // Retain a hidden, non-rendered ribbon as a compatibility target for older
@@ -1703,6 +1724,14 @@ Editor::Editor(bool preview):preview_(preview) {
     addViewDestination(2,"Tools",toolPage,QStyle::SP_ComputerIcon);
     addViewDestination(2,"History",historyPage,QStyle::SP_FileDialogListView);
 
+    auto sidebarAction=viewMenu->addAction("Tools sidebar");
+    sidebarAction->setObjectName("showWorkspaceSidebar");
+    sidebarAction->setCheckable(true);
+    sidebarAction->setChecked(toggleTools->isChecked());
+    sidebarAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
+    sidebarAction->setToolTip("Toggle the workspace tools panel while keeping the icon rail");
+    connect(toggleTools,&QToolButton::toggled,sidebarAction,&QAction::setChecked);
+    connect(sidebarAction,&QAction::toggled,toggleTools,&QToolButton::setChecked);
     auto explorerAction=viewMenu->addAction("Project explorer");
     explorerAction->setObjectName("showProjectExplorer");
     explorerAction->setCheckable(true);
