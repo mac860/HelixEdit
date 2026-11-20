@@ -4,11 +4,23 @@
 
 Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
 
-**Status: 0.1.6 beta development on `main` (compilation/CI verification pending).** The map now renders annotations and recognition sites against the active sequence, but this 0.1.6 change must still be compiled, tested and compared against verified source records before any research-grade claim.
+**Status: 0.1.7 beta development on `main` (fresh build/CI verification pending).** The importer now handles Addgene-style GenBank metadata URLs and unquoted feature labels; a new native Ubuntu build is required to verify the changes.
 
 ![HelixEdit sequence map](docs/map.png)
 
 ![HelixEdit alignment editor](docs/alignment.png)
+
+## New in 0.1.7: corrected GenBank / FASTA import
+
+The attached Addgene #10878 GenBank file (`addgene-plasmid-10878-sequence-438456.gbk`) exposed an import bug: the parser split records at **every** `//`, including `https://www.snapgene.com` in a COMMENT line. This cut off the `ORIGIN` sequence and incorrectly produced *"Invalid or empty sequence"*.
+
+**Fixed on `main`:** GenBank records terminate only at standalone `//` lines. The parser now preserves source labels written as `/label=AmpR` or `/label=AmpR promoter`, as well as quoted labels. UTF-8 BOMs are handled, and FASTA files can begin with blank/comment lines. Invalid FASTA messages now identify the record and offending character instead of giving only a generic error.
+
+The supplied Addgene GenBank file declares **8,901 bp circular DNA** and contains **42 feature location entries**. The present HelixEdit simple-interval importer can represent **40** of these feature intervals; the two joined-location annotations are **skipped with warnings**, not silently converted into invalid continuous features. Imported annotations need independent biological verification before research use.
+
+**Open annotated sequences:** choose **File → Open…**, then the downloaded `.gbk` / `.gb` file. HelixEdit should show 8,901 bp, circular topology, and the imported feature labels in Map/Features. If you instead open a **FASTA** of the same plasmid, the nucleotide sequence imports without GenBank annotation metadata; use the sequence-matched GenBank feature-import action to attach labels.
+
+Run the updated [core import regression tests](tests/core_tests.cpp) with `bash scripts/build_ubuntu_deb.sh`. See [import fix and scientific limitations](docs/IMPORT_017.md).
 
 ## New in 0.1.6: sequence-correct circular plasmid maps
 
@@ -157,12 +169,12 @@ git pull --ff-only origin main
 bash scripts/build_ubuntu_deb.sh
 ```
 
-The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.6-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
+The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.7-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
 
 Install the generated package (use the exact path printed by the script):
 
 ```bash
-sudo apt install --reinstall ./build-ubuntu-amd64/HelixEdit-0.1.6-x86_64.deb
+sudo apt install --reinstall ./build-ubuntu-amd64/HelixEdit-0.1.7-x86_64.deb
 helixedit
 ```
 
