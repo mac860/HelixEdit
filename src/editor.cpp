@@ -285,16 +285,6 @@ Editor::Editor(bool preview):preview_(preview) {
     auto setRibbonIcon=[this](QAction *action,QStyle::StandardPixmap icon){
         if(action && action->icon().isNull())action->setIcon(style()->standardIcon(icon));
     };
-    auto fileNew=fileMenu->addAction("New workspace…",QKeySequence::New,this,[this]{
-        if(!canReplace())return;
-        Document d=demo();
-        d.records.resize(1);
-        d.records[0].name="New sequence";
-        d.records[0].features.clear();
-        d.records[0].circular=false;
-        setDocument(d);
-        statusBar()->showMessage("New unsaved workspace. Use Save project to choose a file.");
-    });
     // Keep the existing menu actions as the single command source.
     auto actionFor=[&](QMenu *menu,const QString &name,QStyle::StandardPixmap icon){
         QAction *a=findMenuAction(menu,name);
@@ -305,7 +295,6 @@ Editor::Editor(bool preview):preview_(preview) {
     auto openA=actionFor(fileMenu,"Open…",QStyle::SP_DialogOpenButton);
     auto saveA=actionFor(fileMenu,"Save project",QStyle::SP_DialogSaveButton);
     auto exportA=actionFor(fileMenu,"Export FASTA / CLUSTAL…",QStyle::SP_DialogSaveButton);
-    auto newA=actionFor(fileMenu,"New workspace…",QStyle::SP_FileIcon);
     auto addA=actionFor(edit,"Add sequence…",QStyle::SP_FileIcon);
     auto reverseA=actionFor(edit,"Reverse complement selected rows",QStyle::SP_BrowserReload);
     auto gapA=actionFor(edit,"Insert gap at selected column",QStyle::SP_ArrowRight);
@@ -320,7 +309,7 @@ Editor::Editor(bool preview):preview_(preview) {
     auto importA=actionFor(addgeneMenu,"Import Addgene GenBank into project…",QStyle::SP_DialogOpenButton);
     setRibbonIcon(undo,QStyle::SP_ArrowBack);
     setRibbonIcon(redo,QStyle::SP_ArrowForward);
-    addRibbonCategory("Home",{{"New",newA},{"Open",openA},{"Save",saveA},
+    addRibbonCategory("Home",{{"Open",openA},{"Save",saveA},
                               {"Undo",undo},{"Redo",redo},{"Export",exportA}});
     addRibbonCategory("Sequence",{{"Add sequence",addA},{"Insert gap",gapA},
                                   {"Reverse",reverseA},{"Translate",translateA},{"Find ORFs",orfA}});
