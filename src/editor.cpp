@@ -308,7 +308,7 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
     p.setPen(muted);
     p.setFont(QFont(labelFont.family(),8));
     QString footer=showEnzymes
-        ?QString("%1 recognition sites from 26 curated motifs").arg(totalSiteCount)
+        ?QString("%1 recognition sites from %2 curated motifs").arg(totalSiteCount).arg(restrictionMotifs().size())
         :QString("Restriction recognition labels hidden");
     if(uniqueCuttersOnly)footer+=QString("  ·  %1 unique sites shown").arg(visibleSiteCount);
     if(hiddenLabels)footer+=QString("  ·  %1 labels hidden (see Features / Enzymes)").arg(hiddenLabels);
