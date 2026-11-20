@@ -231,7 +231,7 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
                               trackRadius,4.5,4.5);
             } else {
                 const QPainterPath band=bandStroker.createStroke(arc);
-                p.fillPath(band,color);
+                p.fillPath(band,QBrush(color));
                 p.setPen(QPen(color.darker(dark?118:146),0.8));
                 p.setBrush(Qt::NoBrush);
                 p.drawPath(band);
