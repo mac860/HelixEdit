@@ -20,6 +20,23 @@ private slots:
   QCOMPARE(sites[0].start,8);
   QCOMPARE(sites[0].end,14);
  }
+ void verifiedCommonPalindromicSites() {
+  Record r;r.name="source";r.sequence="GGGCTAGCTTTGGTACCACGCGT";
+  auto sites=findRestrictionSites(r);
+  auto has=[&](const QString &enzyme,int position) {
+   return std::any_of(sites.begin(),sites.end(),[&](const RestrictionSite &site){
+    return site.enzyme==enzyme && site.start==position;
+   });
+  };
+  QVERIFY(has("NheI",2));
+  QVERIFY(has("KpnI",11));
+  QVERIFY(has("MluI",17));
+  r.sequence.replace(2,6,"CTAGCA");
+  const auto mutated=findRestrictionSites(r);
+  QVERIFY(std::none_of(mutated.begin(),mutated.end(),[](const RestrictionSite &site){
+   return site.enzyme=="NheI";
+  }));
+ }
  void noWrapLinear() {
   Record r;r.name="p";r.sequence="AATTCGGGG";r.circular=false;
   QVERIFY(findRestrictionSites(r).isEmpty());
