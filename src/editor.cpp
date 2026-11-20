@@ -592,7 +592,7 @@ Editor::Editor(bool preview):preview_(preview) {
             "\nOnly the last 1 MiB is displayed; the complete file remains on disk.");
     });
     tools->addAction("Configure executables…",this,&Editor::toolSettings);
-    auto help=menuBar()->addMenu("&Help");help->addAction("About HelixEdit",this,[this]{QMessageBox::about(this,"HelixEdit 0.1.0","Independent, offline sequence editor.\nOriginal implementation inspired by familiar sequence workflows.\nNot affiliated with BioEdit or SnapGene.\n\nDevelopment preview: verify results before research use.\nSee README for format and analysis limitations.");});
+    auto help=menuBar()->addMenu("&Help");help->addAction("About HelixEdit",this,[this]{QMessageBox::about(this,"HelixEdit 0.1.2 beta","Independent, offline sequence editor.\nOriginal implementation inspired by familiar sequence workflows.\nNot affiliated with BioEdit or SnapGene.\n\nDevelopment preview: verify results before research use.\nSee README for format and analysis limitations.");});
     auto bar=addToolBar("Quick actions");
     bar->setObjectName("quickActions");
     bar->setMovable(false);
@@ -730,11 +730,11 @@ Editor::Editor(bool preview):preview_(preview) {
     auto featureLabels=new QCheckBox("Features");featureLabels->setChecked(true);
     mapStripLayout->addWidget(enzymeLabels);mapStripLayout->addWidget(featureLabels);
     mapStripLayout->addStretch();
-    auto zoomOut=new QToolButton(mapStrip);zoomOut->setText("−");
+    auto zoomOut=new QToolButton(mapStrip);zoomOut->setObjectName("mapZoomOut");zoomOut->setText("−");
     zoomOut->setToolTip("Zoom out plasmid map");
-    auto zoomReset=new QToolButton(mapStrip);zoomReset->setText("100%");
+    auto zoomReset=new QToolButton(mapStrip);zoomReset->setObjectName("mapZoomReset");zoomReset->setText("100%");
     zoomReset->setToolTip("Reset map zoom");
-    auto zoomIn=new QToolButton(mapStrip);zoomIn->setText("+");
+    auto zoomIn=new QToolButton(mapStrip);zoomIn->setObjectName("mapZoomIn");zoomIn->setText("+");
     zoomIn->setToolTip("Zoom in plasmid map");
     mapStripLayout->addWidget(new QLabel("Map zoom"));mapStripLayout->addWidget(zoomOut);
     mapStripLayout->addWidget(zoomReset);mapStripLayout->addWidget(zoomIn);
@@ -871,7 +871,7 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     for(auto name:QStringList{"mafft","muscle"}){auto b=new QPushButton("Align document with "+name.toUpper());tl->addWidget(b);connect(b,&QPushButton::clicked,this,[this,name]{align(name);});}
     auto cancel=new QPushButton("Cancel running alignment");tl->addWidget(cancel);connect(cancel,&QPushButton::clicked,this,&Editor::cancelAlignment);
     auto cfg=new QPushButton("Configure package paths…");tl->addWidget(cfg);connect(cfg,&QPushButton::clicked,this,&Editor::toolSettings);
-    log_=new QPlainTextEdit;log_->setReadOnly(true);log_->setPlaceholderText("Job logs appear here. No alignment tools are bundled.");tl->addWidget(log_,1);
+    log_=new QPlainTextEdit;log_->setObjectName("alignerLog");log_->setReadOnly(true);log_->setPlaceholderText("Job logs appear here. No alignment tools are bundled.");tl->addWidget(log_,1);
     tabs_->addTab(toolPage,"03  Local tools");
     // Map-first scientific navigation. Each page invokes existing, real algorithms.
     tabs_->removeTab(tabs_->indexOf(mapPage));
