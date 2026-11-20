@@ -313,6 +313,14 @@ Editor::Editor(bool preview):preview_(preview) {
     setWindowTitle("HelixEdit");resize(1260,780);setMinimumSize(900,600);
     model=new AlignmentModel(this);history=new QUndoStack(this);history->setUndoLimit(30);
     applyTheme(savedTheme());
+    auto viewMenu=menuBar()->addMenu("&View");
+    auto wrapMenuAction=viewMenu->addAction("Wrap to Window");
+    wrapMenuAction->setObjectName("menuWrapToWindow");
+    wrapMenuAction->setCheckable(true);
+    wrapMenuAction->setChecked(QSettings("HelixEdit","HelixEdit")
+        .value("sequence/wrapToWindow",true).toBool());
+    wrapMenuAction->setShortcut(QKeySequence("Ctrl+Shift+W"));
+    wrapMenuAction->setToolTip("Show active sequence with dynamically wrapped DNA/RNA or protein blocks");
     auto fileMenu=menuBar()->addMenu("&File");
     fileMenu->addAction("New project / workspace…",QKeySequence::New,this,[this]{
         if(busy())return;
@@ -950,6 +958,11 @@ Editor::Editor(bool preview):preview_(preview) {
     wrapToggle_->setToolTip("Reflow the selected sequence into 5′/3′ blocks as the window is resized. Turn off to edit multiple alignment rows.");
     wrapToggle_->setChecked(QSettings("HelixEdit","HelixEdit")
         .value("sequence/wrapToWindow",true).toBool());
+    connect(wrapMenuAction,&QAction::toggled,wrapToggle_,&QCheckBox::setChecked);
+    connect(wrapToggle_,&QCheckBox::toggled,wrapMenuAction,&QAction::setChecked);
+    connect(wrapMenuAction,&QAction::triggered,this,[this]{
+        if(tabs_)tabs_->setCurrentIndex(1);
+    });
     complementToggle_=new QCheckBox("Complementary strand",sequenceStrip);
     complementToggle_->setObjectName("showComplement");
     complementToggle_->setToolTip("Show a 3′ to 5′ aligned complementary DNA/RNA strand (not a reverse-complement sequence export).");
