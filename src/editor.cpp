@@ -117,6 +117,28 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
             p.drawText(QRectF(left,yy+8,qMax<qreal>(70,right-left),17),Qt::AlignLeft,
                 f.name.left(22));
         }
+        if(showEnzymes && alphabet!="Protein") {
+            const auto sites=findRestrictionSites(record);
+            QHash<QString,int> counts;
+            for(const auto &site:sites)++counts[site.enzyme];
+            int drawn=0;
+            for(const auto &site:sites) {
+                if(uniqueCuttersOnly && counts.value(site.enzyme)!=1)continue;
+                if(drawn>=26)break;
+                const qreal xx=x+w*site.start/n;
+                const qreal yy=y-18-(drawn%3)*14;
+                p.setPen(QPen(dark?QColor("#62d5c1"):QColor("#356fe4"),1.5));
+                p.drawLine(QPointF(xx,y-8),QPointF(xx,yy+3));
+                QFont labelFont=p.font();labelFont.setPointSize(8);p.setFont(labelFont);
+                p.drawText(QRectF(xx-38,yy-15,77,15),Qt::AlignCenter,
+                    site.enzyme+" "+QString::number(site.start+1));
+                ++drawn;
+            }
+            p.setPen(muted);
+            p.drawText(QRectF(bounds.left()+10,bounds.bottom()-30,bounds.width()-20,20),
+                Qt::AlignCenter,QString("%1 exact recognition sites · %2 displayed · no cut predictions")
+                    .arg(sites.size()).arg(drawn));
+        }
         p.setBrush(Qt::NoBrush);p.restore();return;
     }
     const QPointF center=bounds.center();
@@ -285,8 +307,9 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
     }
     p.setPen(muted);
     p.setFont(QFont(labelFont.family(),8));
-    QString footer=QString("%1 recognition sites from %2 curated motifs")
-        .arg(totalSiteCount).arg(26);
+    QString footer=showEnzymes
+        ?QString("%1 recognition sites from 26 curated motifs").arg(totalSiteCount)
+        :QString("Restriction recognition labels hidden");
     if(uniqueCuttersOnly)footer+=QString("  ·  %1 unique sites shown").arg(visibleSiteCount);
     if(hiddenLabels)footer+=QString("  ·  %1 labels hidden (see Features / Enzymes)").arg(hiddenLabels);
     p.drawText(QRectF(bounds.left()+12,bounds.bottom()-25,bounds.width()-24,16),
@@ -1120,7 +1143,7 @@ Editor::Editor(bool preview):preview_(preview) {
     enzymeLabels->setObjectName("mapEnzymeToggle");
     enzymeLabels->setChecked(QSettings("HelixEdit","HelixEdit").value("map/showEnzymes",true).toBool());
     mapEnzymeToggle_=enzymeLabels;
-    enzymeLabels->setToolTip("Show exact recognition sites from the built-in eight-enzyme set");
+    enzymeLabels->setToolTip("Show exact recognition sites from the curated 26-enzyme recognition set");
     auto featureLabels=new QCheckBox("Features");
     featureLabels->setObjectName("mapFeatureToggle");
     featureLabels->setChecked(QSettings("HelixEdit","HelixEdit").value("map/showFeatures",true).toBool());
@@ -1279,7 +1302,7 @@ Editor::Editor(bool preview):preview_(preview) {
         const auto sites=findRestrictionSites(record);
         QString report=QString("Sequence: %1\nTopology: %2\n"
             "Recognition coordinates: 1-based inclusive\n"
-            "Prototype: eight exact recognition motifs; no cut offsets or digest simulation.\n\n")
+            "26 curated exact palindromic recognition motifs; sites show recognition starts, not cleavage offsets. No methylation or digest simulation.\n\n")
             .arg(record.name,record.circular?"Circular":"Linear");
         if(sites.isEmpty())report+="No sites found for the current motif set.";
         for(const auto &site:sites)
@@ -1628,7 +1651,7 @@ void Editor::updateSelection() {
         } else {
             const auto sites=findRestrictionSites(r);
             if(sites.isEmpty()) {
-                auto item=new QListWidgetItem("No exact recognition sites in the built-in eight-enzyme set");
+                auto item=new QListWidgetItem("No exact recognition sites in the curated 26-enzyme recognition set");
                 item->setFlags(Qt::NoItemFlags);enzymeList_->addItem(item);
             }
             for(const auto &hit:sites) {
