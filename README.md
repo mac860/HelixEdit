@@ -20,7 +20,7 @@ The **Sequence** tab now offers a responsive, SnapGene-style **Wrap to Window** 
 - **Click a base** to select its original alignment column; **double-click** to switch to the original editable **Grid** at that position. The underlying sequence, annotations, and undo history do not change when switching views.
 - **Wrap off** returns to the original multi-record, editable alignment grid. For DNA/RNA and protein, all alignment and analysis commands continue to operate on the underlying data.
 
-The controls also appear in **Settings → Preferences → Map & editing** and persist as `sequence/wrapToWindow`, `sequence/showComplement`, and `sequence/showFeatures`. For short sequences, only one wrapped block is needed. This initial implementation is a read-only visualization; it does not perform annotation editing or multi-sequence alignment editing inside the wrapped canvas. [Implementation and test notes](docs/GUI_015.md).
+You can also toggle the same mode through **View → Wrap to Window** (**Ctrl+Shift+W**). The controls also appear in **Settings → Preferences → Map & editing** and persist as `sequence/wrapToWindow`, `sequence/showComplement`, and `sequence/showFeatures`. For short sequences, only one wrapped block is needed. This initial implementation is a read-only visualization; it does not perform annotation editing or multi-sequence alignment editing inside the wrapped canvas. [Implementation and test notes](docs/GUI_015.md).
 
 ## New in 0.1.4: Visual examples, icon & automatic source discovery
 
