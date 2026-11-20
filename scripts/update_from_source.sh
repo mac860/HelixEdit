@@ -60,7 +60,7 @@ else
   fi
   CHANGES="$(git -C "$SOURCE" rev-list --count "$LOCAL..$REMOTE")"
   echo "Update available: $CHANGES commits (${LOCAL:0:12} -> ${REMOTE:0:12})"
-  git -C "$SOURCE" log --no-decorate --format='%h %s' "$LOCAL..$REMOTE" | head -n 25
+  git -C "$SOURCE" log --max-count=25 --no-decorate --format='%h %s' "$LOCAL..$REMOTE"
   if [[ "$MODE" == --check ]]; then
     echo "Check complete. Select 'Update & install' to build, test and install."
     exit 0
