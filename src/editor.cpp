@@ -1666,7 +1666,77 @@ Editor::Editor(bool preview):preview_(preview) {
     features_->setObjectName("featureNavigator");
     an->addWidget(features_);sl->addWidget(annotations,2);
     split->insertWidget(0,side);split->setStretchFactor(0,0);
-    split->setStretchFactor(1,1);split->setSizes({245,960});
+    split->setStretchFactor(1,1);split->setSizes({215,960});
+
+    // Keep the underlying seven scientific pages for editing, scientific
+    // navigation and regression tests, but expose them as compact left-side
+    // view destinations rather than a redundant second top tab bar.
+    tabs_->tabBar()->hide();
+    struct ViewNavigation {QToolButton *button; QWidget *page;};
+    QVector<ViewNavigation> viewButtons;
+    int navOffsets[]={0,0,0};
+    auto addViewDestination=[&](int workspace,const QString &label,QWidget *page,
+                               QStyle::StandardPixmap icon){
+        QWidget *content=contextLayouts[workspace]->parentWidget();
+        auto control=new QToolButton(content);
+        control->setObjectName("view"+label);
+        control->setProperty("viewNavigation",true);
+        control->setProperty("workspaceRole",
+            workspace==0?"sequence":(workspace==1?"plasmid":"analysis"));
+        control->setText(label);
+        control->setIcon(style()->standardIcon(icon));
+        control->setIconSize(QSize(16,16));
+        control->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+        control->setCheckable(true);
+        control->setMinimumHeight(31);
+        control->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);
+        control->setToolTip("Open "+label+" scientific view");
+        contextLayouts[workspace]->insertWidget(1+navOffsets[workspace]++,control);
+        viewButtons.append({control,page});
+        connect(control,&QToolButton::clicked,this,[this,page]{tabs_->setCurrentWidget(page);});
+    };
+    addViewDestination(0,"Sequence",alignment,QStyle::SP_FileDialogDetailedView);
+    addViewDestination(1,"Map",mapPage,QStyle::SP_DriveCDIcon);
+    addViewDestination(1,"Enzymes",enzymePage,QStyle::SP_FileDialogContentsView);
+    addViewDestination(1,"Features",featurePage,QStyle::SP_FileDialogDetailedView);
+    addViewDestination(1,"Primers",primerPage,QStyle::SP_DirIcon);
+    addViewDestination(2,"Tools",toolPage,QStyle::SP_ComputerIcon);
+    addViewDestination(2,"History",historyPage,QStyle::SP_FileDialogListView);
+
+    auto explorerAction=viewMenu->addAction("Project explorer");
+    explorerAction->setObjectName("showProjectExplorer");
+    explorerAction->setCheckable(true);
+    explorerAction->setShortcut(QKeySequence("Ctrl+Shift+E"));
+    connect(toggleProject,&QToolButton::toggled,side,&QWidget::setVisible);
+    connect(toggleProject,&QToolButton::toggled,explorerAction,&QAction::setChecked);
+    connect(explorerAction,&QAction::toggled,toggleProject,&QToolButton::setChecked);
+    auto selectWorkspace=[=](int index) {
+        const int mode=(index==1?0:(index==0||index==2||index==3||index==4?1:2));
+        const QToolButton *choices[]={activitySequence,activityPlasmid,activityAnalysis};
+        for(int j=0;j<3;++j)
+            const_cast<QToolButton*>(choices[j])->setChecked(mode==j);
+        contextStack->setCurrentIndex(mode);
+        const QString roles[]={"sequence","plasmid","analysis"};
+        const QString titles[]={"SEQUENCE","PLASMID","ANALYSIS"};
+        const QString sub[]={"Edit & navigate","Vectors & annotations","Bioinformatics workflows"};
+        toolPanelTitle->setText(titles[mode]);
+        toolPanelSubtitle->setText(sub[mode]);
+        toolPanel->setProperty("activeWorkspace",roles[mode]);
+        toolPanel->style()->unpolish(toolPanel);
+        toolPanel->style()->polish(toolPanel);
+        toolPanel->update();
+        for(const auto &entry:viewButtons)entry.button->setChecked(entry.page==tabs_->widget(index));
+    };
+    connect(activitySequence,&QToolButton::clicked,this,[this,alignment]{tabs_->setCurrentWidget(alignment);});
+    connect(activityPlasmid,&QToolButton::clicked,this,[this,mapPage]{tabs_->setCurrentWidget(mapPage);});
+    connect(activityAnalysis,&QToolButton::clicked,this,[this,toolPage]{tabs_->setCurrentWidget(toolPage);});
+    connect(tabs_,&QTabWidget::currentChanged,this,[=](int index) {
+        selectWorkspace(index);
+    });
+    selectWorkspace(tabs_->currentIndex());
+    // Show the project explorer by default for sequence editing. Hide it on
+    // plasmid/analysis workspaces to prioritize map and result canvas width.
+    toggleProject->setChecked(tabs_->currentIndex()==1);
     connect(navFilter,&QLineEdit::textChanged,this,[this](const QString &filter){
         for(int i=0;i<navigator_->count();++i)
             navigator_->item(i)->setHidden(!navigator_->item(i)->text().contains(filter,Qt::CaseInsensitive));
