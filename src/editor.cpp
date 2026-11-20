@@ -166,7 +166,7 @@ Editor::Editor(bool preview):preview_(preview) {
         const QUrl url(QString("https://www.addgene.org/%1/").arg(id));
         QDesktopServices::openUrl(url);
         QMessageBox::information(this,"Import from Addgene",
-            "Sign in to your Addgene account in the browser, then download the GenBank (.gb/.gbk) sequence from the plasmid page.\\n\\n"
+            "Sign in to your Addgene account in the browser, then download the GenBank (.gb/.gbk) sequence from the plasmid page.\n\n"
             "Use 'Import Addgene GenBank into project…' to add it without replacing your current alignment. "
             "Some plasmids have only partial sequences; check the source and annotations.");
     });
@@ -254,7 +254,7 @@ Editor::Editor(bool preview):preview_(preview) {
             QMessageBox::information(this,"Remove sequences",
                 "At least one sequence must remain in the current document.");return;
         }
-        const QString message=QString("Remove %1 selected sequence(s)?\\n\\nThis can be undone.")
+        const QString message=QString("Remove %1 selected sequence(s)?\n\nThis can be undone.")
                                   .arg(rows.size());
         if(QMessageBox::question(this,"Remove sequences",message)!=QMessageBox::Yes)return;
         auto d=model->document;
@@ -280,10 +280,10 @@ Editor::Editor(bool preview):preview_(preview) {
         runSafely([&]{
             const auto &record=model->document.records[activeRow()];
             const auto orfs=findOrfs(record.sequence,minimum);
-            QString report="Sequence: "+record.name+"\\nCoordinates: 1-based inclusive, forward reference\\nComplete ATG-start ORFs only\\n\\n";
+            QString report="Sequence: "+record.name+"\nCoordinates: 1-based inclusive, forward reference\nComplete ATG-start ORFs only\n\n";
             if(orfs.isEmpty())report+="No matching ORFs found.";
             for(const auto &orf:orfs) {
-                report+=QString("Frame %1  |  %2–%3  |  %4 aa\\n%5\\n\\n")
+                report+=QString("Frame %1  |  %2–%3  |  %4 aa\n%5\n\n")
                     .arg(orf.frame).arg(orf.start+1).arg(orf.end)
                     .arg(orf.protein.size()).arg(orf.protein);
             }
@@ -321,12 +321,12 @@ Editor::Editor(bool preview):preview_(preview) {
     });
     analysis->addAction("Sequence statistics…",this,[this]{
         const auto &d=model->document;
-        QString report="SEQUENCE STATISTICS\\n";
-        report+="Molecule type: "+d.alphabet+"\\nRecord count: "+QString::number(d.records.size())+
-                "\\nAlignment width: "+QString::number(width(d))+"\\n\\n";
+        QString report="SEQUENCE STATISTICS\n";
+        report+="Molecule type: "+d.alphabet+"\nRecord count: "+QString::number(d.records.size())+
+                "\nAlignment width: "+QString::number(width(d))+"\n\n";
         for(const auto &r:d.records){
             const auto x=sequenceStatistics(r,d.alphabet);
-            report+=QString("%1\\n  ungapped=%2  columns=%3  gaps=%4  ambiguous=%5  GC=%6\\n")
+            report+=QString("%1\n  ungapped=%2  columns=%3  gaps=%4  ambiguous=%5  GC=%6\n")
                 .arg(r.name).arg(x.ungappedLength).arg(x.alignmentLength)
                 .arg(x.gaps).arg(x.ambiguous)
                 .arg(x.gc<0?"NA":QString::number(x.gc,'f',2)+"%");
@@ -336,14 +336,14 @@ Editor::Editor(bool preview):preview_(preview) {
     analysis->addAction("p-distance matrix…",this,[this]{
         runSafely([&]{
             const auto matrix=pDistanceMatrix(model->document);
-            QString report="Uncorrected p-distance: mismatches / compared non-gap, non-? columns.\\n"
-                           "Ambiguous symbols are compared literally. NA = no comparable columns.\\n\\n";
+            QString report="Uncorrected p-distance: mismatches / compared non-gap, non-? columns.\n"
+                           "Ambiguous symbols are compared literally. NA = no comparable columns.\n\n";
             for(int i=0;i<matrix.size();++i){
                 report+=model->document.records[i].name+": ";
                 for(int j=0;j<matrix[i].size();++j)
                     report+=(matrix[i][j]<0?"NA":QString::number(matrix[i][j],'f',5))+
                             (j+1==matrix[i].size()?"":"  |  ");
-                report+="\\n";
+                report+="\n";
             }
             showAnalysis("p-distance matrix",report);
         });
@@ -438,7 +438,7 @@ Editor::Editor(bool preview):preview_(preview) {
         const QString queryPath=dir.filePath("query.fa");
         QFile file(queryPath);
         if(!file.open(QIODevice::WriteOnly)){QMessageBox::warning(this,"BLAST","Cannot write query.");return;}
-        const QByteArray input=(">helix_query\\n"+query+"\\n").toUtf8();
+        const QByteArray input=(">helix_query\n"+query+"\n").toUtf8();
         file.write(input);file.close();
         const QStringList args={"-query",queryPath,"-db",db,"-outfmt",
             "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore",
@@ -456,16 +456,16 @@ Editor::Editor(bool preview):preview_(preview) {
         const QString stdoutText=QString::fromUtf8(job.readAllStandardOutput());
         const QString stderrText=QString::fromUtf8(job.readAllStandardError());
         const QString hash=QString::fromLatin1(QCryptographicHash::hash(input,QCryptographicHash::Sha256).toHex());
-        const QString log=QString("UTC: %1\\nTool: %2\\nExecutable: %3\\n"
-            "Database: %4\\nQuery SHA256: %5\\nArguments: %6\\nExit code: %7\\n"
-            "STDERR:\\n%8\\nRESULTS (BLAST tabular outfmt 6):\\n%9\\n")
+        const QString log=QString("UTC: %1\nTool: %2\nExecutable: %3\n"
+            "Database: %4\nQuery SHA256: %5\nArguments: %6\nExit code: %7\n"
+            "STDERR:\n%8\nRESULTS (BLAST tabular outfmt 6):\n%9\n")
             .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate),kind,exe,db,hash,
                  args.join(" "),QString::number(job.exitCode()),stderrText,stdoutText);
         const QString logFolder=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
         QDir().mkpath(logFolder);
         QFile audit(QDir(logFolder).filePath("analysis-history.log"));
         if(audit.open(QIODevice::WriteOnly|QIODevice::Append)){
-            audit.write(("\\n===== BLAST+ RUN =====\\n"+log).toUtf8());
+            audit.write(("\n===== BLAST+ RUN =====\n"+log).toUtf8());
             audit.close();
         }
         if(log_)log_->appendPlainText(log);
@@ -626,9 +626,9 @@ Editor::Editor(bool preview):preview_(preview) {
         const QString inputPath=dir.filePath("primer3_input.txt");
         QFile input(inputPath);
         if(!input.open(QIODevice::WriteOnly)){QMessageBox::warning(this,"Primer3","Cannot create input file.");return;}
-        const QByteArray payload=("SEQUENCE_ID=HelixEdit_template\\nSEQUENCE_TEMPLATE="+sequence+
-            "\\nPRIMER_TASK=generic\\nPRIMER_PICK_LEFT_PRIMER=1\\nPRIMER_PICK_RIGHT_PRIMER=1\\n"
-            "PRIMER_NUM_RETURN=5\\nPRIMER_PRODUCT_SIZE_RANGE=100-1000\\n=\\n").toUtf8();
+        const QByteArray payload=("SEQUENCE_ID=HelixEdit_template\nSEQUENCE_TEMPLATE="+sequence+
+            "\nPRIMER_TASK=generic\nPRIMER_PICK_LEFT_PRIMER=1\nPRIMER_PICK_RIGHT_PRIMER=1\n"
+            "PRIMER_NUM_RETURN=5\nPRIMER_PRODUCT_SIZE_RANGE=100-1000\n=\n").toUtf8();
         input.write(payload);input.close();
         QProcess process;
         process.setProgram(executable);
@@ -647,8 +647,8 @@ Editor::Editor(bool preview):preview_(preview) {
         if(process.exitStatus()!=QProcess::NormalExit||process.exitCode()!=0){
             QMessageBox::warning(this,"Primer3 failed",errors.left(2000));return;
         }
-        showAnalysis("Primer3 design output",result+"\\n"+errors+
-            "\\nReview primer specificity and thermodynamics independently before experimental use.");
+        showAnalysis("Primer3 design output",result+"\n"+errors+
+            "\nReview primer specificity and thermodynamics independently before experimental use.");
     });
     auto primerButton=new QPushButton("Primer library");
     connect(primerButton,&QPushButton::clicked,this,[this]{
@@ -665,7 +665,7 @@ Editor::Editor(bool preview):preview_(preview) {
         const QString libraryPath=QDir(base).filePath("primers.csv");
         QFile input(libraryPath);
         if(input.open(QIODevice::ReadOnly))editor->setPlainText(QString::fromUtf8(input.readAll()));
-        else editor->setPlainText("name,sequence,notes\\n");
+        else editor->setPlainText("name,sequence,notes\n");
         auto actions=new QHBoxLayout;
         auto mapButton=new QPushButton("Map primers to active plasmid");
         auto saveButton=new QPushButton("Save library");
@@ -683,15 +683,15 @@ Editor::Editor(bool preview):preview_(preview) {
         connect(mapButton,&QPushButton::clicked,&dlg,[=,this]{
             const auto primers=readPrimerCsv(editor->toPlainText());
             const auto &record=model->document.records[activeRow()];
-            QString result=QString("%1 · %2 primers\\n\\n").arg(record.name).arg(primers.size());
+            QString result=QString("%1 · %2 primers\n\n").arg(record.name).arg(primers.size());
             for(const auto &primer:primers){
                 auto hits=primerHits(record,primer.sequence);
-                result+=QString("%1  [%2 nt; GC %3%; Wallace ~%4 C]  %5 hits\\n")
+                result+=QString("%1  [%2 nt; GC %3%; Wallace ~%4 C]  %5 hits\n")
                     .arg(primer.name).arg(primer.sequence.size())
                     .arg(primerGc(primer.sequence),0,'f',1).arg(primerWallaceTm(primer.sequence))
                     .arg(hits.size());
                 for(const auto &hit:hits)
-                    result+=QString("  %1–%2  %3%4\\n").arg(hit.start+1).arg(hit.end)
+                    result+=QString("  %1–%2  %3%4\n").arg(hit.start+1).arg(hit.end)
                         .arg(hit.reverse?"reverse":"forward")
                         .arg(hit.end>ungapped(record.sequence).size()?" (wraps origin)":"");
             }
@@ -711,13 +711,13 @@ Editor::Editor(bool preview):preview_(preview) {
         }
         const auto &record=model->document.records[activeRow()];
         const auto sites=findRestrictionSites(record);
-        QString report=QString("Sequence: %1\\nTopology: %2\\n"
-            "Recognition coordinates: 1-based inclusive\\n"
-            "Prototype: eight exact recognition motifs; no cut offsets or digest simulation.\\n\\n")
+        QString report=QString("Sequence: %1\nTopology: %2\n"
+            "Recognition coordinates: 1-based inclusive\n"
+            "Prototype: eight exact recognition motifs; no cut offsets or digest simulation.\n\n")
             .arg(record.name,record.circular?"Circular":"Linear");
         if(sites.isEmpty())report+="No sites found for the current motif set.";
         for(const auto &site:sites)
-            report+=QString("%1: %2–%3%4\\n").arg(site.enzyme)
+            report+=QString("%1: %2–%3%4\n").arg(site.enzyme)
                 .arg(site.start+1).arg(site.end)
                 .arg(site.end>ungapped(record.sequence).size()?" (wraps origin)":"");
         showAnalysis("Restriction recognition sites",report);
@@ -830,8 +830,8 @@ void Editor::align(const QString &tool){
     const QByteArray sourceBytes=fasta(input).toUtf8();
     const QString digest=QString::fromLatin1(QCryptographicHash::hash(
         sourceBytes,QCryptographicHash::Sha256).toHex());
-    log_->appendPlainText(QString("UTC: %1\\nTool: %2\\nExecutable: %3\\n"
-        "Arguments: %4\\nInput SHA256: %5\\n")
+    log_->appendPlainText(QString("UTC: %1\nTool: %2\nExecutable: %3\n"
+        "Arguments: %4\nInput SHA256: %5\n")
         .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate),tool,exe,args.join(" "),digest));
     tabs_->setCurrentIndex(2);
     if(tool=="muscle")connect(job,&QProcess::readyReadStandardOutput,this,[this,job]{auto text=QString::fromUtf8(job->readAllStandardOutput());if(log_->document()->blockCount()>2000)log_->clear();log_->appendPlainText(text.right(16000));});
@@ -847,8 +847,8 @@ void Editor::align(const QString &tool){
         if(QDir().mkpath(folder)){
             QFile audit(QDir(folder).filePath("analysis-history.log"));
             if(audit.open(QIODevice::WriteOnly|QIODevice::Append)){
-                audit.write(("\\n===== ALIGNMENT RUN =====\\n"+
-                    log_->toPlainText()+"\\n").toUtf8());
+                audit.write(("\n===== ALIGNMENT RUN =====\n"+
+                    log_->toPlainText()+"\n").toUtf8());
                 audit.close();
             }
         }
