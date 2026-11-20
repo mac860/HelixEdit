@@ -873,11 +873,171 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     auto cfg=new QPushButton("Configure package paths…");tl->addWidget(cfg);connect(cfg,&QPushButton::clicked,this,&Editor::toolSettings);
     log_=new QPlainTextEdit;log_->setReadOnly(true);log_->setPlaceholderText("Job logs appear here. No alignment tools are bundled.");tl->addWidget(log_,1);
     tabs_->addTab(toolPage,"03  Local tools");
-    auto side=new QWidget;side->setMinimumWidth(205);side->setMaximumWidth(290);auto sl=new QVBoxLayout(side);sl->setContentsMargins(9,0,0,0);
-    auto overview=new QGroupBox("DOCUMENT");auto ov=new QVBoxLayout(overview);stats_=new QLabel;stats_->setWordWrap(true);ov->addWidget(stats_);sl->addWidget(overview);
-    auto sel=new QGroupBox("SELECTION");auto se=new QVBoxLayout(sel);selection_=new QLabel;selection_->setWordWrap(true);se->addWidget(selection_);sl->addWidget(sel);
-    auto annotations=new QGroupBox("FEATURES / ACTIVE ROW");auto an=new QVBoxLayout(annotations);features_=new QListWidget;an->addWidget(features_);sl->addWidget(annotations,1);
-    auto tip=new QLabel("<b style='color:#7c5ce7'>Small app. Clear workflow.</b><br><br>Save .helix projects to retain features and topology. FASTA exports contain sequence only.");tip->setWordWrap(true);sl->addWidget(tip);split->addWidget(side);split->setSizes({860,240});
+    // Map-first scientific navigation. Each page invokes existing, real algorithms.
+    tabs_->removeTab(tabs_->indexOf(mapPage));
+    tabs_->insertTab(0,mapPage,"Map");
+    tabs_->setTabText(tabs_->indexOf(alignment),"Sequence");
+    tabs_->setTabText(tabs_->indexOf(toolPage),"Tools");
+
+    auto enzymePage=new QWidget;auto enzymeLayout=new QVBoxLayout(enzymePage);
+    enzymeLayout->setContentsMargins(9,8,9,8);enzymeLayout->setSpacing(6);
+    auto enzymeTitle=new QLabel("<b>Restriction-site explorer</b>  ·  exact recognition motifs; not a digest simulation");
+    enzymeTitle->setWordWrap(true);enzymeLayout->addWidget(enzymeTitle);
+    auto enzymeSearch=new QLineEdit;enzymeSearch->setPlaceholderText("Filter enzyme or coordinate…");
+    enzymeLayout->addWidget(enzymeSearch);
+    enzymeList_=new QListWidget;enzymeList_->setObjectName("enzymeExplorer");
+    enzymeLayout->addWidget(enzymeList_,1);
+    auto enzymeReport=new QPushButton("Full recognition-site report");
+    enzymeLayout->addWidget(enzymeReport);
+    connect(enzymeReport,&QPushButton::clicked,restrictionButton,&QPushButton::click);
+    connect(enzymeSearch,&QLineEdit::textChanged,this,[this](const QString &filter){
+        for(int i=0;i<enzymeList_->count();++i)
+            enzymeList_->item(i)->setHidden(!enzymeList_->item(i)->text().contains(filter,Qt::CaseInsensitive));
+    });
+    connect(enzymeList_,&QListWidget::itemActivated,this,[this,alignment](QListWidgetItem *item){
+        if(!item||!item->data(Qt::UserRole).isValid())return;
+        const int pos=item->data(Qt::UserRole).toInt();
+        if(pos<0||pos>=model->columnCount())return;
+        tabs_->setCurrentWidget(alignment);
+        table->setCurrentIndex(model->index(activeRow(),pos));
+        table->scrollTo(table->currentIndex(),QAbstractItemView::PositionAtCenter);
+    });
+    tabs_->insertTab(2,enzymePage,"Enzymes");
+
+    auto featurePage=new QWidget;auto featureLayout=new QVBoxLayout(featurePage);
+    featureLayout->setContentsMargins(9,8,9,8);featureLayout->setSpacing(6);
+    featureLayout->addWidget(new QLabel("<b>Annotated regions</b>  ·  1-based inclusive coordinates"));
+    annotationTable_=new QTreeWidget;annotationTable_->setObjectName("annotationExplorer");
+    annotationTable_->setColumnCount(5);
+    annotationTable_->setHeaderLabels({"Feature","Type","Start","End","Strand"});
+    annotationTable_->setRootIsDecorated(false);
+    annotationTable_->setAlternatingRowColors(true);
+    featureLayout->addWidget(annotationTable_,1);
+    auto featureActions=new QHBoxLayout;
+    auto createFeature=new QPushButton("+ Add feature");
+    auto exportFeatures=new QPushButton("Export GenBank…");
+    featureActions->addWidget(createFeature);featureActions->addWidget(exportFeatures);
+    featureActions->addStretch();featureLayout->addLayout(featureActions);
+    connect(createFeature,&QPushButton::clicked,feat,&QPushButton::click);
+    connect(exportFeatures,&QPushButton::clicked,gbExportA,&QAction::trigger);
+    connect(annotationTable_,&QTreeWidget::itemActivated,this,[this,alignment](QTreeWidgetItem *item,int){
+        if(!item)return;
+        selectFeature(item->data(0,Qt::UserRole).toInt());
+        tabs_->setCurrentWidget(alignment);
+    });
+    tabs_->insertTab(3,featurePage,"Features");
+
+    auto primerPage=new QWidget;auto primerLayout=new QVBoxLayout(primerPage);
+    primerLayout->setContentsMargins(9,8,9,8);primerLayout->setSpacing(6);
+    auto primerTitle=new QLabel("<b>Primer workspace</b>  ·  local CSV library, IUPAC-aware exact binding and Primer3");
+    primerTitle->setWordWrap(true);primerLayout->addWidget(primerTitle);
+    auto primerActions=new QHBoxLayout;
+    auto primerLibraryAction=new QPushButton("Open primer library");
+    auto primerDesignAction=new QPushButton("Design with Primer3");
+    auto primerRefresh=new QPushButton("Map saved primers");
+    primerActions->addWidget(primerLibraryAction);
+    primerActions->addWidget(primerDesignAction);
+    primerActions->addWidget(primerRefresh);
+    primerActions->addStretch();primerLayout->addLayout(primerActions);
+    auto primerSummary=new QPlainTextEdit;
+    primerSummary->setReadOnly(true);primerSummary->setObjectName("primerExplorer");
+    primerSummary->setPlaceholderText("Choose 'Map saved primers' to report exact binding matches for the active sequence.");
+    primerLayout->addWidget(primerSummary,1);
+    connect(primerLibraryAction,&QPushButton::clicked,primerButton,&QPushButton::click);
+    connect(primerDesignAction,&QPushButton::clicked,primer3Button,&QPushButton::click);
+    connect(primerRefresh,&QPushButton::clicked,this,[this,primerSummary]{
+        if(model->document.alphabet=="Protein"){
+            primerSummary->setPlainText("Primer binding requires a nucleotide project.");return;
+        }
+        const QString path=QDir(QStandardPaths::writableLocation(
+            QStandardPaths::AppDataLocation)).filePath("primers.csv");
+        QFile file(path);
+        if(!file.open(QIODevice::ReadOnly)){
+            primerSummary->setPlainText("No local primer library yet. Use 'Open primer library' to create one.");
+            return;
+        }
+        runSafely([this,primerSummary,&file]{
+            const auto primers=readPrimerCsv(QString::fromUtf8(file.readAll()));
+            const auto &record=model->document.records[activeRow()];
+            QString report=record.name+"  ·  "+QString::number(primers.size())+" primers\n\n";
+            for(const auto &primer:primers) {
+                const auto matches=primerHits(record,primer.sequence);
+                report+=QString("%1  (%2 nt; GC %3%)  —  %4 hits\n")
+                    .arg(primer.name).arg(primer.sequence.size())
+                    .arg(primerGc(primer.sequence),0,'f',1).arg(matches.size());
+                for(const auto &hit:matches)
+                    report+=QString("   %1–%2  %3\n").arg(hit.start+1).arg(hit.end)
+                        .arg(hit.reverse?"reverse":"forward");
+            }
+            primerSummary->setPlainText(report);
+        });
+    });
+    tabs_->insertTab(4,primerPage,"Primers");
+
+    auto historyPage=new QWidget;auto historyLayout=new QVBoxLayout(historyPage);
+    historyLayout->setContentsMargins(9,8,9,8);historyLayout->setSpacing(6);
+    historyLayout->addWidget(new QLabel("<b>Edit undo history</b>"));
+    auto undoView=new QUndoView(history,historyPage);
+    undoView->setObjectName("undoHistory");
+    historyLayout->addWidget(undoView,1);
+    historyLayout->addWidget(new QLabel("<b>Reproducible external-tool log</b>  ·  stored locally"));
+    auto historyLog=new QPlainTextEdit;historyLog->setObjectName("reproducibilityLog");
+    historyLog->setReadOnly(true);historyLayout->addWidget(historyLog,1);
+    auto reloadHistory=new QPushButton("Refresh analysis log");
+    historyLayout->addWidget(reloadHistory);
+    connect(reloadHistory,&QPushButton::clicked,this,[historyLog]{
+        const QString path=QDir(QStandardPaths::writableLocation(
+            QStandardPaths::AppDataLocation)).filePath("analysis-history.log");
+        QFile file(path);
+        if(!file.open(QIODevice::ReadOnly)){
+            historyLog->setPlainText("No external-tool executions recorded yet.");return;
+        }
+        historyLog->setPlainText(QString::fromUtf8(file.readAll().right(1024*1024)));
+    });
+    tabs_->insertTab(5,historyPage,"History");
+    connect(tabs_,&QTabWidget::currentChanged,this,[this,historyPage,reloadHistory](int){
+        if(tabs_->currentWidget()==historyPage)reloadHistory->click();
+    });
+    tabs_->setCurrentWidget(mapPage);
+
+    auto side=new QWidget;side->setObjectName("projectSidebar");
+    side->setMinimumWidth(205);side->setMaximumWidth(295);
+    auto sl=new QVBoxLayout(side);sl->setContentsMargins(9,9,9,7);sl->setSpacing(7);
+    auto sideTitle=new QLabel("HELIXEDIT  /  PROJECT");
+    sideTitle->setObjectName("sidebarHeading");sl->addWidget(sideTitle);
+    auto navFilter=new QLineEdit;navFilter->setPlaceholderText("Filter sequences…");
+    navFilter->setObjectName("navigatorFilter");sl->addWidget(navFilter);
+    navigator_=new QListWidget; navigator_->setObjectName("sequenceNavigator");
+    navigator_->setSelectionMode(QAbstractItemView::SingleSelection);
+    navigator_->setMinimumHeight(110);
+    sl->addWidget(navigator_,2);
+    auto overview=new QGroupBox("DOCUMENT");
+    auto ov=new QVBoxLayout(overview);stats_=new QLabel;
+    stats_->setWordWrap(true);ov->addWidget(stats_);sl->addWidget(overview);
+    auto sel=new QGroupBox("ACTIVE SEQUENCE");
+    auto se=new QVBoxLayout(sel);selection_=new QLabel;
+    selection_->setWordWrap(true);se->addWidget(selection_);sl->addWidget(sel);
+    auto annotations=new QGroupBox("ANNOTATIONS");
+    auto an=new QVBoxLayout(annotations);features_=new QListWidget;
+    features_->setObjectName("featureNavigator");
+    an->addWidget(features_);sl->addWidget(annotations,2);
+    split->insertWidget(0,side);split->setStretchFactor(0,0);
+    split->setStretchFactor(1,1);split->setSizes({245,960});
+    connect(navFilter,&QLineEdit::textChanged,this,[this](const QString &filter){
+        for(int i=0;i<navigator_->count();++i)
+            navigator_->item(i)->setHidden(!navigator_->item(i)->text().contains(filter,Qt::CaseInsensitive));
+    });
+    connect(navigator_,&QListWidget::currentItemChanged,this,
+            [this](QListWidgetItem *item,QListWidgetItem *){
+        if(!item)return;
+        const int row=item->data(Qt::UserRole).toInt();
+        if(row<0||row>=model->rowCount())return;
+        if(model->columnCount()>0) {
+            const int col=qMax(0,table->currentIndex().column());
+            table->setCurrentIndex(model->index(row,qMin(col,model->columnCount()-1)));
+        }
+        updateSelection();
+    });
     connect(model,&AlignmentModel::residueEdit,this,&Editor::editResidue);
     connect(table->selectionModel(),&QItemSelectionModel::selectionChanged,this,[this]{updateSelection();});
     connect(table->selectionModel(),&QItemSelectionModel::currentChanged,this,[this]{updateSelection();});
