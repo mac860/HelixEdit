@@ -36,6 +36,7 @@ protected:
 };
 // Compact, theme-aware residue composition visualization for the active row.
 class CompositionView : public QWidget {
+    Q_OBJECT
 public:
     explicit CompositionView(QWidget *parent=nullptr):QWidget(parent) {
         setMinimumHeight(67);setMaximumHeight(72);
