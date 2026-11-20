@@ -220,6 +220,26 @@ Document acceptAlignment(const Document &original,const Document &aligned) {
     }
     validateDocument(result); return result;
 }
+void attachExactGenBankAnnotations(Document &target,int recordIndex,const Document &annotatedSource) {
+    validateDocument(target);
+    validateDocument(annotatedSource);
+    if(recordIndex<0||recordIndex>=target.records.size())
+        fail("Active record index outside document.");
+    if(annotatedSource.records.size()!=1 || target.alphabet!=annotatedSource.alphabet ||
+       target.alphabet=="Protein")
+        fail("An annotation donor must contain one matching DNA or RNA record.");
+    const Record &donor=annotatedSource.records.first();
+    if(donor.features.isEmpty())
+        fail("The donor has no supported simple annotations.");
+    Record &recipient=target.records[recordIndex];
+    if(ungapped(recipient.sequence)!=ungapped(donor.sequence))
+        fail("Annotation donor and recipient differ. Exact base equality and origin orientation are required.");
+    // Feature intervals refer to an identical ungapped coordinate system.
+    // Copy only authenticated donor data; never infer vector genes from raw DNA.
+    recipient.features=donor.features;
+    recipient.circular=donor.circular;
+    validateDocument(target);
+}
 Document demo() {
     Document d;
     QString motif="ATGACCGTACGTTCCGATGCTAGCTACGATCGGATCCGCTAACGTTAGCGAATTCGGCATCGTACGATGACCTGACTGACG";
