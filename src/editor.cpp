@@ -120,6 +120,57 @@ Editor::Editor(bool preview):preview_(preview) {
     auto actOpen=fileMenu->addAction("Open…",QKeySequence::Open,this,&Editor::open);
     auto actSave=fileMenu->addAction("Save project",QKeySequence::Save,this,[this]{save();});
     fileMenu->addAction("Save project as…",QKeySequence::SaveAs,this,[this]{save(true);});
+    auto addgeneMenu=fileMenu->addMenu("Addgene plasmids");
+    addgeneMenu->addAction("Find plasmid by Addgene ID…",this,[this]{
+        bool ok=false;
+        const int id=QInputDialog::getInt(this,"Addgene plasmid","Addgene plasmid ID",10878,1,999999999,1,&ok);
+        if(!ok)return;
+        const QUrl url(QString("https://www.addgene.org/%1/").arg(id));
+        QDesktopServices::openUrl(url);
+        QMessageBox::information(this,"Import from Addgene",
+            "Sign in to your Addgene account in the browser, then download the GenBank (.gb/.gbk) sequence from the plasmid page.\\n\\n"
+            "Use 'Import Addgene GenBank into project…' to add it without replacing your current alignment. "
+            "Some plasmids have only partial sequences; check the source and annotations.");
+    });
+    addgeneMenu->addAction("Search Addgene catalog…",this,[]{
+        QDesktopServices::openUrl(QUrl("https://www.addgene.org/search/catalog/plasmids/"));
+    });
+    addgeneMenu->addAction("Import Addgene GenBank into project…",this,[this]{
+        if(busy())return;
+        const QString p=QFileDialog::getOpenFileName(this,"Import downloaded Addgene GenBank",{},
+            "GenBank (*.gb *.gbk *.genbank);;All files (*)");
+        if(p.isEmpty())return;
+        runSafely([&]{
+            const Document imported=readDocument(p);
+            if(imported.alphabet=="Protein")
+                throw std::runtime_error("Addgene plasmid import expects nucleotide sequence.");
+            if(imported.records.isEmpty())
+                throw std::runtime_error("No plasmid records were found.");
+            if(model->document.alphabet=="Protein")
+                throw std::runtime_error("Open a DNA/RNA project before importing plasmids.");
+            auto next=model->document;
+            // Do not mix RNA and DNA molecule types silently.
+            if(next.alphabet!=imported.alphabet && !next.records.isEmpty()) {
+                if(QMessageBox::question(this,"Molecule type",
+                    "Imported sequence type differs from this project. Continue only if the sequences are compatible?",
+                    QMessageBox::Yes|QMessageBox::No)!=QMessageBox::Yes)return;
+            }
+            for(auto record:imported.records) {
+                const QString originalName=record.name;
+                int suffix=2;
+                auto taken=[&](const QString &name){
+                    for(const auto &existing:next.records)if(existing.name==name)return true;
+                    return false;
+                };
+                while(taken(record.name))record.name=originalName+QString(" (%1)").arg(suffix++);
+                next.records.append(record);
+            }
+            next.warnings+=imported.warnings;
+            next.warnings.append("Imported from a user-selected GenBank file. Verify full-length sequence and annotations against the Addgene source.");
+            commit(next,"Import Addgene GenBank");
+            statusBar()->showMessage(QString("Imported %1 plasmid record(s); save your .helix project.").arg(imported.records.size()));
+        });
+    });
     fileMenu->addAction("Export FASTA / CLUSTAL…",this,&Editor::exportFile);
     fileMenu->addAction("Export map as SVG…",this,[this]{auto p=QFileDialog::getSaveFileName(this,"Export vector map",{},"SVG (*.svg)");if(!p.isEmpty())runSafely([&]{exportMap(p);});});
     fileMenu->addAction("Load teaching demo",this,[this]{if(canReplace())setDocument(demo());});
