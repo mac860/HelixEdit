@@ -71,6 +71,10 @@ private slots:
             auto *enzyme=dialog->findChild<QCheckBox*>("enzymeLabelsPreference");
             controlsReady=pages && pages->count()==4 && theme && source && autosave && enzyme;
             if(controlsReady) {
+                // CI must not depend on paths saved in an earlier test session.
+                source->clear();
+                for(auto *input:dialog->findChildren<QLineEdit*>())
+                    if(input->objectName().startsWith("executable_"))input->clear();
                 theme->setCurrentText("Dracula");
                 auto *buttonBox=dialog->findChild<QDialogButtonBox*>();
                 if(buttonBox && buttonBox->button(QDialogButtonBox::Save))
