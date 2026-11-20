@@ -1,0 +1,86 @@
+name: Build and test
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  linux:
+    name: Ubuntu / ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ qt6-base-dev qt6-svg-dev dpkg-dev mafft muscle
+      - name: Configure and build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel 2
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build --output-on-failure
+      - name: Render previews
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          ./build/helixedit --screenshot build/alignment.png
+          ./build/helixedit --screenshot build/map.png --map-preview
+      - name: Package DEB
+        working-directory: build
+        run: cpack -G DEB
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HelixEdit-ubuntu-${{ matrix.arch }}
+          path: |
+            build/HelixEdit-*.deb
+            build/alignment.png
+            build/map.png
+          if-no-files-found: error
+  macos:
+    name: macOS / Apple Silicon
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native dependencies
+        run: brew install cmake qt mafft muscle
+      - name: Configure and build ARM64
+        run: |
+          test "$(uname -m)" = "arm64"
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
+          cmake --build build --parallel 2
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build --output-on-failure
+      - name: Bundle Qt and ad-hoc sign
+        run: |
+          "$(brew --prefix qt)/bin/macdeployqt" build/helixedit.app
+          mkdir -p build/helixedit.app/Contents/Resources/licenses
+          cp LICENSE build/helixedit.app/Contents/Resources/licenses/HelixEdit-MIT.txt
+          python3 scripts/collect_qt_licenses.py "$(brew --prefix qt)" build/helixedit.app/Contents/Resources/licenses/Qt
+          codesign --force --deep --sign - build/helixedit.app
+          codesign --verify --deep --strict build/helixedit.app
+          ditto -c -k --keepParent build/helixedit.app build/HelixEdit-macos-arm64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HelixEdit-macos-arm64
+          path: build/HelixEdit-macos-arm64.zip
+          if-no-files-found: error
