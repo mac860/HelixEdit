@@ -5,6 +5,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QStandardPaths>
+#include "source_discovery.h"
 
 namespace helix {
 // Explicit, user-initiated source updater. No periodic network traffic or
@@ -28,12 +29,12 @@ inline void openSourceUpdater(QWidget *parent) {
     auto sourceRow=new QHBoxLayout;
     auto sourcePath=new QLineEdit;
     sourcePath->setObjectName("updateSourcePath");
-    sourcePath->setPlaceholderText("Existing Git checkout (contains CMakeLists.txt and .git)");
+    sourcePath->setPlaceholderText("Detected HelixEdit source checkout · select folder only if needed");
     QSettings settings("HelixEdit","HelixEdit");
-    sourcePath->setText(settings.value("updater/source").toString());
+    sourcePath->setText(discoverSourceFolder());
     auto browse=new QPushButton("Browse…");
     sourceRow->addWidget(sourcePath,1);sourceRow->addWidget(browse);
-    layout->addWidget(new QLabel("Existing source folder"));
+    layout->addWidget(new QLabel("HelixEdit repository · local source (auto-detected when possible)"));
     layout->addLayout(sourceRow);
     auto info=new QLabel(
         "Safety: the updater accepts only the official repository origin and a clean "
