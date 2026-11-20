@@ -1058,7 +1058,20 @@ Editor::Editor(bool preview):preview_(preview) {
     featureLabels->setObjectName("mapFeatureToggle");
     featureLabels->setChecked(QSettings("HelixEdit","HelixEdit").value("map/showFeatures",true).toBool());
     mapFeatureToggle_=featureLabels;
-    mapStripLayout->addWidget(enzymeLabels);mapStripLayout->addWidget(featureLabels);
+    auto topologySelect=new QCheckBox("Circular DNA",mapStrip);
+    topologySelect->setObjectName("confirmedCircularTopology");
+    topologySelect->setToolTip("FASTA does not establish topology. Enable only for a verified circular molecule. This changes the map and origin-spanning recognition sites.");
+    circularTopologyToggle_=topologySelect;
+    auto uniqueCutters=new QCheckBox("Unique sites",mapStrip);
+    uniqueCutters->setObjectName("uniqueCuttersFilter");
+    uniqueCutters->setToolTip("Show only enzymes with exactly one recognition site on the molecule; use Enzymes for all recognition sites.");
+    uniqueCutters->setChecked(QSettings("HelixEdit","HelixEdit")
+        .value("map/uniqueCuttersOnly",true).toBool());
+    uniqueCuttersToggle_=uniqueCutters;
+    mapStripLayout->addWidget(topologySelect);
+    mapStripLayout->addWidget(enzymeLabels);
+    mapStripLayout->addWidget(uniqueCutters);
+    mapStripLayout->addWidget(featureLabels);
     mapStripLayout->addStretch();
     auto zoomOut=new QToolButton(mapStrip);zoomOut->setObjectName("mapZoomOut");zoomOut->setText("−");
     zoomOut->setToolTip("Zoom out plasmid map");
@@ -1072,6 +1085,7 @@ Editor::Editor(bool preview):preview_(preview) {
     map_=new MapView;map_->setObjectName("plasmidMap");
     map_->showEnzymes=enzymeLabels->isChecked();
     map_->showFeatures=featureLabels->isChecked();
+    map_->uniqueCuttersOnly=uniqueCutters->isChecked();
     map_->setZoom(QSettings("HelixEdit","HelixEdit").value("map/defaultZoom",100).toInt()/100.0);
     ml->addWidget(map_,1);
     connect(enzymeLabels,&QCheckBox::toggled,map_,[this](bool on){
@@ -1081,6 +1095,11 @@ Editor::Editor(bool preview):preview_(preview) {
     connect(featureLabels,&QCheckBox::toggled,map_,[this](bool on){
         QSettings("HelixEdit","HelixEdit").setValue("map/showFeatures",on);
         map_->showFeatures=on;map_->update();
+    });
+    connect(uniqueCutters,&QCheckBox::toggled,map_,[this](bool on){
+        QSettings("HelixEdit","HelixEdit").setValue("map/uniqueCuttersOnly",on);
+        map_->uniqueCuttersOnly=on;
+        map_->update();
     });
     connect(zoomIn,&QToolButton::clicked,map_,[this]{map_->setZoom(map_->zoom+.1);});
     connect(zoomOut,&QToolButton::clicked,map_,[this]{map_->setZoom(map_->zoom-.1);});
@@ -1202,7 +1221,7 @@ Editor::Editor(bool preview):preview_(preview) {
                 .arg(site.end>ungapped(record.sequence).size()?" (wraps origin)":"");
         showAnalysis("Restriction recognition sites",report);
     });
-auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(topology);
+
     auto feat=new QPushButton("+ Feature");mapButtons->addWidget(feat);auto svg=new QPushButton("Export SVG");mapButtons->addWidget(svg);mapButtons->addStretch();ml->addLayout(mapButtons);
     tabs_->addTab(mapPage,"02  Sequence map");
     auto toolPage=new QWidget;auto tl=new QVBoxLayout(toolPage);auto th=new QLabel("<b style='font-size:19px'>Bring your own tools.</b><br><br>Native editor. Optional local packages. No sequence uploads.<br>MAFFT and MUSCLE 5 run as background jobs; output is checked before applying.");th->setWordWrap(true);tl->addWidget(th);
@@ -1396,7 +1415,17 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     connect(molecule_,&QComboBox::currentTextChanged,this,[this](const QString &s){if(busy())return;runSafely([&]{auto d=model->document;d.alphabet=s;validateDocument(d);commit(d,"Change molecule type");});QSignalBlocker blocker(molecule_);molecule_->setCurrentText(model->document.alphabet);});
     connect(find,&QPushButton::clicked,this,&Editor::findNext);connect(search_,&QLineEdit::returnPressed,this,&Editor::findNext);
     connect(features_,&QListWidget::itemClicked,this,[this](QListWidgetItem *item){selectFeature(features_->row(item));});
-    connect(topology,&QPushButton::clicked,this,[this]{if(busy())return;auto d=model->document;if(d.alphabet=="Protein"){QMessageBox::information(this,"Topology","Circular maps are available for nucleotide sequences.");return;}auto &r=d.records[activeRow()];r.circular=!r.circular;commit(d,"Change topology");});
+    connect(topologySelect,&QCheckBox::toggled,this,[this](bool on){
+        if(busy())return;
+        auto d=model->document;
+        if(d.alphabet=="Protein")return;
+        auto &r=d.records[activeRow()];
+        if(r.circular==on)return;
+        r.circular=on;
+        d.warnings.removeAll("FASTA carries no topology/feature annotations; confirm circularity and import sequence-matched GenBank annotations separately.");
+        d.warnings.append("Topology set manually in HelixEdit. Confirm circularity against laboratory or source records.");
+        commit(d,"Set molecule topology");
+    });
     connect(feat,&QPushButton::clicked,this,&Editor::addFeature);
     connect(svg,&QPushButton::clicked,this,[this]{auto p=QFileDialog::getSaveFileName(this,"Export map",{},"SVG (*.svg)");if(!p.isEmpty())runSafely([&]{exportMap(p);});});
     recoveryPath_=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+"/recovery.helix";
@@ -1487,6 +1516,11 @@ void Editor::updateSelection() {
     if(wrapped_) {
         wrapped_->setRecord(r,doc.alphabet);
         wrapped_->setSelectedColumn(table->currentIndex().column());
+    }
+    if(circularTopologyToggle_) {
+        QSignalBlocker block(circularTopologyToggle_);
+        circularTopologyToggle_->setChecked(r.circular);
+        circularTopologyToggle_->setEnabled(doc.alphabet!="Protein");
     }
     map_->record=r;
     map_->alphabet=doc.alphabet;
