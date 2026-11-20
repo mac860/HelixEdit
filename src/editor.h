@@ -55,7 +55,7 @@ private:
     bool preview_;
     QString path_,recoveryPath_;
     QTabWidget *tabs_;
-    MapView *map_;
+    MapView *map_=nullptr;
     QLabel *stats_,*selection_,*notice_,*mapTitle_;
     QListWidget *features_;
     QListWidget *navigator_=nullptr;
