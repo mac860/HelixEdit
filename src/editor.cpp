@@ -11,6 +11,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <algorithm>
+#include <QPainterPath>
 #ifdef Q_OS_UNIX
 #include <signal.h>
 #include <unistd.h>
@@ -357,7 +358,10 @@ Editor::Editor(bool preview):preview_(preview) {
                 d.warnings.clear();
                 d.warnings << note;
                 setDocument(d);
-                statusBar()->showMessage("Loaded bundled "+alphabet+" example · Save as a .helix project to keep your edits.");
+                // FASTA collections are sequence datasets, not annotated plasmid maps.
+                // Start in the colored alignment and composition visualization.
+                if(tabs_ && tabs_->count()>1)tabs_->setCurrentIndex(1);
+                statusBar()->showMessage("Loaded bundled "+alphabet+" example · View colored residues and composition; save as .helix to keep edits.");
             });
         });
     };
