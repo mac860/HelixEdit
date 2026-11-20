@@ -938,14 +938,82 @@ Editor::Editor(bool preview):preview_(preview) {
     auto split=new QSplitter(Qt::Horizontal,root);layout->addWidget(split,1);
     tabs_=new QTabWidget;tabs_->setObjectName("studioTabs");tabs_->setDocumentMode(true);
     tabs_->setMovable(false);split->addWidget(tabs_);
-    auto alignment=new QWidget;auto al=new QVBoxLayout(alignment);al->setContentsMargins(0,8,0,0);
+    auto alignment=new QWidget;auto al=new QVBoxLayout(alignment);
+    al->setContentsMargins(7,7,7,6);al->setSpacing(6);
+    auto sequenceStrip=new QWidget(alignment);
+    sequenceStrip->setObjectName("sequenceDisplayStrip");
+    auto displayRow=new QHBoxLayout(sequenceStrip);
+    displayRow->setContentsMargins(6,3,6,3);
+    displayRow->setSpacing(11);
+    wrapToggle_=new QCheckBox("Wrap to Window",sequenceStrip);
+    wrapToggle_->setObjectName("wrapToWindow");
+    wrapToggle_->setToolTip("Reflow the selected sequence into 5′/3′ blocks as the window is resized. Turn off to edit multiple alignment rows.");
+    wrapToggle_->setChecked(QSettings("HelixEdit","HelixEdit")
+        .value("sequence/wrapToWindow",true).toBool());
+    complementToggle_=new QCheckBox("Complementary strand",sequenceStrip);
+    complementToggle_->setObjectName("showComplement");
+    complementToggle_->setToolTip("Show a 3′ to 5′ aligned complementary DNA/RNA strand (not a reverse-complement sequence export).");
+    complementToggle_->setChecked(QSettings("HelixEdit","HelixEdit")
+        .value("sequence/showComplement",true).toBool());
+    wrappedFeaturesToggle_=new QCheckBox("Feature tracks",sequenceStrip);
+    wrappedFeaturesToggle_->setObjectName("showWrappedFeatures");
+    wrappedFeaturesToggle_->setChecked(QSettings("HelixEdit","HelixEdit")
+        .value("sequence/showFeatures",true).toBool());
+    displayRow->addWidget(wrapToggle_);
+    displayRow->addWidget(complementToggle_);
+    displayRow->addWidget(wrappedFeaturesToggle_);
+    displayRow->addStretch(1);
+    auto modeHint=new QLabel("Wrapped preview · select a base • Grid · double-click to edit",sequenceStrip);
+    modeHint->setObjectName("sequenceViewHint");
+    modeHint->setToolTip("The wrapped strand view is read-only. The editable grid and undo history remain available.");
+    displayRow->addWidget(modeHint);
+    al->addWidget(sequenceStrip);
+
     auto legend=new QLabel("   <b style='color:#199c73'>A</b> adenine   <b style='color:#408bd0'>C</b> cytosine   <b style='color:#b18527'>G</b> guanine   <b style='color:#cf6281'>T/U</b> thymine / uracil   ·   Double-click a residue to edit");legend->setObjectName("residueLegend");al->addWidget(legend);
     composition_=new CompositionView(alignment);al->addWidget(composition_);
     table=new QTableView;table->setObjectName("alignment");table->setModel(model);table->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     table->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);table->horizontalHeader()->setMinimumSectionSize(24);table->horizontalHeader()->setDefaultSectionSize(28);
     table->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);table->verticalHeader()->setDefaultSectionSize(35);table->verticalHeader()->setFixedWidth(205);table->verticalHeader()->setTextElideMode(Qt::ElideRight);
     table->setSelectionMode(QAbstractItemView::ExtendedSelection);table->setEditTriggers(QAbstractItemView::DoubleClicked|QAbstractItemView::EditKeyPressed);
-    table->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);al->addWidget(table,1);
+    table->setHorizontalScrollMode(QAbstractItemView::ScrollPerPixel);
+    sequenceViews_=new QStackedWidget(alignment);
+    sequenceViews_->setObjectName("sequenceViewStack");
+    sequenceViews_->addWidget(table); // Existing editable, multiple-record alignment grid.
+    wrapped_=new WrappedSequenceView(sequenceViews_);
+    sequenceViews_->addWidget(wrapped_); // Responsive, read-only active-record preview.
+    wrapped_->setShowComplement(complementToggle_->isChecked());
+    wrapped_->setShowFeatures(wrappedFeaturesToggle_->isChecked());
+    sequenceViews_->setCurrentIndex(wrapToggle_->isChecked()?1:0);
+    al->addWidget(sequenceViews_,1);
+    connect(wrapToggle_,&QCheckBox::toggled,this,[this](bool enabled){
+        QSettings("HelixEdit","HelixEdit").setValue("sequence/wrapToWindow",enabled);
+        sequenceViews_->setCurrentIndex(enabled?1:0);
+        complementToggle_->setEnabled(enabled && model->document.alphabet!="Protein");
+        wrappedFeaturesToggle_->setEnabled(enabled);
+        if(enabled && wrapped_)wrapped_->scrollToAlignmentColumn(table->currentIndex().column());
+    });
+    connect(complementToggle_,&QCheckBox::toggled,this,[this](bool enabled){
+        QSettings("HelixEdit","HelixEdit").setValue("sequence/showComplement",enabled);
+        if(wrapped_)wrapped_->setShowComplement(enabled);
+    });
+    connect(wrappedFeaturesToggle_,&QCheckBox::toggled,this,[this](bool enabled){
+        QSettings("HelixEdit","HelixEdit").setValue("sequence/showFeatures",enabled);
+        if(wrapped_)wrapped_->setShowFeatures(enabled);
+    });
+    complementToggle_->setEnabled(wrapToggle_->isChecked() && model->document.alphabet!="Protein");
+    wrappedFeaturesToggle_->setEnabled(wrapToggle_->isChecked());
+    wrapped_->onColumnActivated=[this](int column){
+        const int row=activeRow();
+        if(row<0||row>=model->rowCount()||column<0||column>=model->columnCount())return;
+        const QModelIndex selected=model->index(row,column);
+        table->setCurrentIndex(selected);
+        table->selectionModel()->select(QItemSelection(selected,selected),
+            QItemSelectionModel::ClearAndSelect);
+        table->scrollTo(selected,QAbstractItemView::PositionAtCenter);
+        statusBar()->showMessage(QString("Selected sequence %1 · alignment column %2")
+            .arg(row+1).arg(column+1));
+    };
+
     auto actions=new QHBoxLayout;actions->setContentsMargins(10,0,10,10);
     for(auto item:QStringList{"+ Gap","Delete columns","Reverse complement","Translate"}) {
         auto b=new QPushButton(item);actions->addWidget(b);
