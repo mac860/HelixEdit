@@ -4,11 +4,22 @@
 
 Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
 
-**Status: 0.1.3 beta development on `main` (compilation/CI verification pending).** The preceding 0.1.2 GUI was successfully installed and screenshotted on Ubuntu 26.04 x86_64 by a user, but this does not validate the new 0.1.3 updater and bundled examples. GitHub Actions targets Ubuntu x86_64/ARM64 and macOS Apple Silicon. Run tests before publishing.
+**Status: 0.1.4 beta development on `main` (new build/CI verification pending).** Previous Ubuntu 26.04 x86_64 builds were user-tested, but the new 0.1.4 graphics, launcher and package changes still require compilation and desktop validation. GitHub Actions targets Ubuntu x86_64/ARM64 and macOS Apple Silicon. Run all tests before publishing.
 
 ![HelixEdit sequence map](docs/map.png)
 
 ![HelixEdit alignment editor](docs/alignment.png)
+
+## New in 0.1.4: Visual examples, icon & automatic source discovery
+
+- **Readable examples:** Removed legacy `gi|...` strings and long metadata from bundled FASTA names while keeping verified EMBL/UniProt accession identifiers. These orchid fragments are established **historical teaching data**, not newly published samples; see [example provenance and limitations](examples/samples/README.md).
+- **Visual sequence workspace:** Opening DNA, simulated RNA or protein teaching collections now selects the colored **Sequence** tab automatically. A new **base/amino-acid composition chart** visualizes the selected record, and Analysis → Sequence statistics provides a table with colorful GC% bars and copyable TSV results. Ordinary FASTA text remains a plain scientific interchange format.
+- **Updated source, by default:** Update and Settings use the currently saved Git checkout or try to find a nearby HelixEdit clone automatically (including common Downloads subfolders). The source updater is deliberately restricted to the existing official `mac860/HelixEdit` repository on `main`; it does not clone another repository or schedule background work. If the checkout is elsewhere, select it once.
+- **Return of the DNA icon:** The original purple/teal HelixEdit SVG is rendered as the window/toolbar icon, installed under standard hicolor and pixmaps locations, and matched to GNOME/Wayland's desktop file. The Debian post-install script refreshes desktop and icon caches, so HelixEdit should appear in Ubuntu's application launcher after installation.
+- **Vibrant Light theme:** blue-lilac layered gradients, aqua accents, softly translucent rounded panels, a subtle sidebar shadow, and rounded plasmid maps. This is **glass-inspired styling**, not operating-system background blur.
+- **Package safeguards:** the build script checks the exact current DEB for executable, launcher, both icon installations, bundled examples, and source updater.
+
+See [the 0.1.4 GUI change notes](docs/GUI_014.md).
 
 ## New in 0.1.2: Compact HelixEdit Studio
 
@@ -33,9 +44,9 @@ Press **Save settings** to apply. **Restore defaults** fills the default values 
 
 **Developed and edited by Wael H** · [waelye@gmail.com](mailto:waelye@gmail.com) · [HelixEdit GitHub repository](https://github.com/mac860/HelixEdit).
 
-## 0.1.3: Update from GitHub source in the app
+## 0.1.4: Update from the existing GitHub source
 
-After installing **HelixEdit 0.1.3 or later**, click **Update** in the upper-right toolbar or choose **Help → Check / update from GitHub source…**. Select the **existing Git clone** (for example `~/Downloads/helix2/HelixEdit`) once; its location is remembered. The app offers two operations:
+After installing **HelixEdit 0.1.4 or later**, click **Update** in the toolbar, **Settings → Update from GitHub source…**, or **Settings → Preferences… → Updates**. The app first tries your **existing HelixEdit Git clone** (for example `~/Downloads/v3/HelixEdit`) automatically. If it cannot locate the source, select its folder once; the location is remembered. The app offers two operations:
 
 1. **Check GitHub:** fetches the remote `main` state and lists new commits; does not change your local files or installed package.
 2. **Update, test & install:** after confirmation, fast-forwards the clean source checkout to the official GitHub `main`, compiles the native Qt application, runs CTest, builds a versioned `.deb`, and requests Ubuntu authentication through `pkexec` for a local package upgrade. Restart HelixEdit to load the update.
@@ -45,18 +56,18 @@ The update process **does not run in the background**, does not discard local ed
 From a terminal, the equivalent commands are:
 
 ```bash
-cd ~/Downloads/helix2/HelixEdit
+cd ~/Downloads/v3/HelixEdit
 bash scripts/update_from_source.sh "$(pwd)" --check
 bash scripts/update_from_source.sh "$(pwd)" --apply
 ```
 
-## 0.1.3: 14 offline teaching examples
+## 0.1.4: 14 offline teaching examples
 
 Choose **File → Open teaching examples** (or **Examples** in the compact toolbar). Three ready-to-edit FASTA collections are packaged and embedded in the application:
 
 | Collection | Contents | Length | Reference/provenance |
 |---|---|---:|---|
-| DNA | 6 orchid ITS/5.8S DNA fragments | 300 nt each | Biopython `ls_orchid.fasta` with EMBL accession labels |
+| DNA | 6 orchid ITS/5.8S DNA fragments | 300 nt each | Biopython `ls_orchid.fasta` with short EMBL accession-based labels |
 | RNA | 3 **simulated** RNA transcriptions (T→U) of public orchid DNA fragments | 300 nt each | Biopython source DNA; not experimentally verified mature transcripts |
 | Protein | 5 UniProt entries: GFP, insulin precursor, alpha/beta hemoglobin, E. coli aspartate aminotransferase | 110–396 aa | UniProtKB accessions in FASTA headers |
 
@@ -118,12 +129,12 @@ git pull --ff-only origin main
 bash scripts/build_ubuntu_deb.sh
 ```
 
-The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.3-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
+The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.4-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
 
 Install the generated package (use the exact path printed by the script):
 
 ```bash
-sudo apt install --reinstall ./build-ubuntu-amd64/HelixEdit-0.1.3-x86_64.deb
+sudo apt install --reinstall ./build-ubuntu-amd64/HelixEdit-0.1.4-x86_64.deb
 helixedit
 ```
 
