@@ -8,3 +8,5 @@ Terminal=false
 Categories=Education;Science;Biology;
 Keywords=DNA;RNA;Protein;FASTA;Alignment;
 StartupNotify=true
+StartupWMClass=helixedit
+TryExec=helixedit
