@@ -1,6 +1,7 @@
 #include "editor.h"
 #include "themes.h"
 #include "orf.h"
+#include "restriction.h"
 #include <QtSvg/QSvgGenerator>
 #include <QDesktopServices>
 #include <cmath>
@@ -269,7 +270,28 @@ Editor::Editor(bool preview):preview_(preview) {
     }actions->addStretch();al->addLayout(actions);tabs_->addTab(alignment,"01  Alignment");
     auto mapPage=new QWidget;auto ml=new QVBoxLayout(mapPage);mapTitle_=new QLabel;mapTitle_->setStyleSheet("font-size:16px;font-weight:bold;padding:12px;");ml->addWidget(mapTitle_);
     map_=new MapView;ml->addWidget(map_,1);
-    auto mapButtons=new QHBoxLayout;auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(topology);
+    auto mapButtons=new QHBoxLayout;
+    auto restrictionButton=new QPushButton("Restriction sites");
+    mapButtons->addWidget(restrictionButton);
+    connect(restrictionButton,&QPushButton::clicked,this,[this]{
+        if(model->document.alphabet=="Protein"){
+            QMessageBox::information(this,"Restriction sites","Select a nucleotide project first.");
+            return;
+        }
+        const auto &record=model->document.records[activeRow()];
+        const auto sites=findRestrictionSites(record);
+        QString report=QString("Sequence: %1\\nTopology: %2\\n"
+            "Recognition coordinates: 1-based inclusive\\n"
+            "Prototype: eight exact recognition motifs; no cut offsets or digest simulation.\\n\\n")
+            .arg(record.name,record.circular?"Circular":"Linear");
+        if(sites.isEmpty())report+="No sites found for the current motif set.";
+        for(const auto &site:sites)
+            report+=QString("%1: %2–%3%4\\n").arg(site.enzyme)
+                .arg(site.start+1).arg(site.end)
+                .arg(site.end>ungapped(record.sequence).size()?" (wraps origin)":"");
+        showAnalysis("Restriction recognition sites",report);
+    });
+auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(topology);
     auto feat=new QPushButton("+ Feature");mapButtons->addWidget(feat);auto svg=new QPushButton("Export SVG");mapButtons->addWidget(svg);mapButtons->addStretch();ml->addLayout(mapButtons);
     tabs_->addTab(mapPage,"02  Sequence map");
     auto toolPage=new QWidget;auto tl=new QVBoxLayout(toolPage);auto th=new QLabel("<b style='font-size:19px'>Bring your own tools.</b><br><br>Native editor. Optional local packages. No sequence uploads.<br>MAFFT and MUSCLE 5 run as background jobs; output is checked before applying.");th->setWordWrap(true);tl->addWidget(th);
