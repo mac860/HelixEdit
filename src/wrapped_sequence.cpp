@@ -88,7 +88,7 @@ void WrappedSequenceView::recalculateLayout() {
     const int available=qMax(90,viewport()->width()-leftGutter_-rightGutter_-14);
     const int groupPixels=groupSize_*glyphWidth_+groupGap_;
     basesPerLine_=qMax(10,(available/groupPixels)*groupSize_);
-    blockHeight_=showComplement_?123:103;
+    blockHeight_=(showComplement_&&alphabet_!="Protein")?123:103;
     if(showFeatures_&&!record_.features.isEmpty())blockHeight_+=36;
     verticalScrollBar()->setSingleStep(qMax(20,blockHeight_/3));
     verticalScrollBar()->setPageStep(qMax(10,viewport()->height()));
@@ -226,7 +226,6 @@ void WrappedSequenceView::paintEvent(QPaintEvent *) {
         p.setBrush(card);
         p.drawRoundedRect(panel,10,10);
         const int rulerY=top+23;
-        const int strandY=top+35;
         const int seqY=top+38;
         const int axisY=top+66;
         const int reverseY=top+74;
@@ -255,7 +254,6 @@ void WrappedSequenceView::paintEvent(QPaintEvent *) {
             }
         }
         p.setFont(mono);
-        const QFontMetrics metrics(mono);
         for(int col=start;col<stop;++col) {
             const int local=col-start;
             const int x=xForOffset(local);
@@ -296,7 +294,20 @@ void WrappedSequenceView::paintEvent(QPaintEvent *) {
                 const qreal y=featureY+(i%2)*15;
                 p.setPen(Qt::NoPen);
                 p.setBrush(annotationColor(i));
-                p.drawRoundedRect(QRectF(x,y,w,12),3,3);
+                const qreal arrow=qMin<qreal>(11,w/3);
+                if(!feature.reverse && visibleFinish==finish && w>=15) {
+                    QPolygonF shape;
+                    shape<<QPointF(x,y)<<QPointF(x+w-arrow,y)
+                        <<QPointF(x+w,y+6)<<QPointF(x+w-arrow,y+12)
+                        <<QPointF(x,y+12);
+                    p.drawPolygon(shape);
+                } else if(feature.reverse && visibleBegin==begin && w>=15) {
+                    QPolygonF shape;
+                    shape<<QPointF(x+arrow,y)<<QPointF(x+w,y)
+                        <<QPointF(x+w,y+12)<<QPointF(x+arrow,y+12)
+                        <<QPointF(x,y+6);
+                    p.drawPolygon(shape);
+                } else p.drawRoundedRect(QRectF(x,y,w,12),3,3);
                 if(w>55) {
                     p.setFont(small);
                     p.setPen(QColor("#222638"));
