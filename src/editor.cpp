@@ -223,7 +223,7 @@ Editor::Editor(bool preview):preview_(preview) {
         action->setCheckable(true);
         action->setChecked(theme==savedTheme());
         themeGroup->addAction(action);
-        connect(action,&QAction::triggered,this,[theme]{applyTheme(theme);});
+        connect(action,&QAction::triggered,this,[this,theme]{applyTheme(theme);if(map_)map_->update();});
     }
     auto fileMenu=menuBar()->addMenu("&File");
     fileMenu->addAction("New project / workspace…",QKeySequence::New,this,[this]{
