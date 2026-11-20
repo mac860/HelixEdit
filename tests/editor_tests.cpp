@@ -193,7 +193,10 @@ private slots:
         auto complement=e.findChild<QCheckBox*>("showComplement");
         auto featureTracks=e.findChild<QCheckBox*>("showWrappedFeatures");
         auto stack=e.findChild<QStackedWidget*>("sequenceViewStack");
+        auto menuWrap=e.findChild<QAction*>("menuWrapToWindow");
         QVERIFY(view);QVERIFY(wrap);QVERIFY(complement);QVERIFY(featureTracks);QVERIFY(stack);
+        QVERIFY(menuWrap);
+        const QVariant previousWrap=QSettings("HelixEdit","HelixEdit").value("sequence/wrapToWindow");
         auto doc=parseFasta(">plasmid\nACGTRYSWKMBDHVN-ATGCTGAACCTG\n");
         doc.records[0].features.append(
             Feature{"test_feature","misc_feature",4,24,false});
@@ -204,6 +207,7 @@ private slots:
         tabs->setCurrentIndex(1);
         wrap->setChecked(true);
         QCOMPARE(stack->currentIndex(),1);
+        QVERIFY(menuWrap->isChecked());
         WrappedSequenceView isolated;
         isolated.resize(850,390);
         isolated.setRecord(doc.records[0],"DNA");
@@ -232,6 +236,12 @@ private slots:
         QCOMPARE(stack->currentIndex(),0);
         QCOMPARE(e.model->document.records[0].sequence,original);
         QCOMPARE(stack->currentWidget(),static_cast<QWidget*>(e.table));
+        QVERIFY(!menuWrap->isChecked());
+        menuWrap->setChecked(true);
+        QCOMPARE(stack->currentIndex(),1);
+        QSettings settings("HelixEdit","HelixEdit");
+        if(previousWrap.isValid())settings.setValue("sequence/wrapToWindow",previousWrap);
+        else settings.remove("sequence/wrapToWindow");
     }
     void compactWorkspaceAndNavigator() {
         Editor editor(true);
