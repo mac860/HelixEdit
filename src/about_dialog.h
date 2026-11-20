@@ -2,6 +2,8 @@
 #include <QtWidgets>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QtSvg/QSvgRenderer>
+#include <QPainter>
 
 namespace helix {
 // A standalone, independent project About view using the same native
@@ -10,7 +12,18 @@ inline void showAboutDialog(QWidget *parent) {
     QDialog dialog(parent);
     dialog.setObjectName("helixAboutDialog");
     dialog.setWindowTitle("About HelixEdit");
-    dialog.setWindowIcon(qApp->windowIcon());
+    QIcon appIcon=qApp->windowIcon();
+    if(appIcon.isNull()) {
+        QPixmap rendered(96,96);
+        rendered.fill(Qt::transparent);
+        QSvgRenderer svg(QStringLiteral(":/packaging/helixedit.svg"));
+        if(svg.isValid()){
+            QPainter painter(&rendered);
+            svg.render(&painter);
+            appIcon=QIcon(rendered);
+        }
+    }
+    dialog.setWindowIcon(appIcon);
     dialog.setMinimumSize(525,390);
     dialog.resize(555,415);
     auto *layout=new QVBoxLayout(&dialog);
@@ -31,7 +44,7 @@ inline void showAboutDialog(QWidget *parent) {
     auto *icon=new QLabel(hero);
     icon->setObjectName("aboutAppIcon");
     icon->setFixedSize(78,78);
-    icon->setPixmap(qApp->windowIcon().pixmap(QSize(72,72)));
+    icon->setPixmap(appIcon.pixmap(QSize(72,72)));
     icon->setAlignment(Qt::AlignCenter);
     heroRow->addWidget(icon);
     auto *headColumn=new QVBoxLayout;
