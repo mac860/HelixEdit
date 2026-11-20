@@ -883,7 +883,8 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     enzymeLayout->setContentsMargins(9,8,9,8);enzymeLayout->setSpacing(6);
     auto enzymeTitle=new QLabel("<b>Restriction-site explorer</b>  ·  exact recognition motifs; not a digest simulation");
     enzymeTitle->setWordWrap(true);enzymeLayout->addWidget(enzymeTitle);
-    auto enzymeSearch=new QLineEdit;enzymeSearch->setPlaceholderText("Filter enzyme or coordinate…");
+    auto enzymeSearch=new QLineEdit;enzymeSearch->setObjectName("enzymeFilter");
+    enzymeSearch->setPlaceholderText("Filter enzyme or coordinate…");
     enzymeLayout->addWidget(enzymeSearch);
     enzymeList_=new QListWidget;enzymeList_->setObjectName("enzymeExplorer");
     enzymeLayout->addWidget(enzymeList_,1);
@@ -897,9 +898,16 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     connect(enzymeList_,&QListWidget::itemActivated,this,[this,alignment](QListWidgetItem *item){
         if(!item||!item->data(Qt::UserRole).isValid())return;
         const int pos=item->data(Qt::UserRole).toInt();
-        if(pos<0||pos>=model->columnCount())return;
+        const auto &record=model->document.records[activeRow()];
+        int alignedPos=-1,base=0;
+        for(int col=0;col<record.sequence.size();++col) {
+            if(record.sequence[col]=='-')continue;
+            if(base==pos) {alignedPos=col;break;}
+            ++base;
+        }
+        if(alignedPos<0)return;
         tabs_->setCurrentWidget(alignment);
-        table->setCurrentIndex(model->index(activeRow(),pos));
+        table->setCurrentIndex(model->index(activeRow(),alignedPos));
         table->scrollTo(table->currentIndex(),QAbstractItemView::PositionAtCenter);
     });
     tabs_->insertTab(2,enzymePage,"Enzymes");
@@ -1071,20 +1079,108 @@ void Editor::setDocument(const Document &d){validateDocument(d);path_.clear();hi
 void Editor::commit(const Document &d,const QString &label){validateDocument(d);history->push(new Change(this,model->document,d,label));}
 void Editor::refresh() {
     const auto &d=model->document;
-    if(auto legend=findChild<QLabel*>("residueLegend"))legend->setText(d.alphabet=="Protein"?"   Protein colours: hydrophobic · basic · acidic · polar · other   /   Double-click a residue to edit":"   A adenine   ·   C cytosine   ·   G guanine   ·   T/U thymine / uracil   /   Double-click a residue to edit");
-    QSignalBlocker block(molecule_);molecule_->setCurrentText(d.alphabet);
-    stats_->setText(QString("<b style='font-size:25px;color:#7450cd'>%1</b> sequences<br><br><b>%2</b> alignment columns<br><br>%3 · local document").arg(d.records.size()).arg(QLocale().toString(helix::width(d))).arg(d.alphabet));
-    notice_->setVisible(!d.warnings.isEmpty());notice_->setText(d.warnings.join(" "));updateSelection();
-    statusBar()->showMessage(QString("%1 sequences   ·   %2 columns   ·   .helix retains features   ·   30-edit undo history").arg(d.records.size()).arg(helix::width(d)));
+    if(auto legend=findChild<QLabel*>("residueLegend"))
+        legend->setText(d.alphabet=="Protein"
+            ? "  PROTEIN   ·   hydrophobic / basic / acidic / polar   ·   Double-click to edit"
+            : "  DNA / RNA   ·   A adenine   ·   C cytosine   ·   G guanine   ·   T/U thymine / uracil");
+    {
+        QSignalBlocker block(molecule_);
+        molecule_->setCurrentText(d.alphabet);
+    }
+    stats_->setText(QString("<b>%1</b> sequences  ·  <b>%2</b> columns<br>%3 project  ·  local")
+        .arg(d.records.size()).arg(QLocale().toString(helix::width(d))).arg(d.alphabet));
+    if(navigator_) {
+        QSignalBlocker block(navigator_);
+        const int chosen=qBound(0,activeRow(),int(d.records.size())-1);
+        const auto *filter=findChild<QLineEdit*>("navigatorFilter");
+        const QString filterText=filter?filter->text():QString{};
+        navigator_->clear();
+        for(int i=0;i<d.records.size();++i) {
+            const auto &r=d.records[i];
+            const int n=ungapped(r.sequence).size();
+            auto item=new QListWidgetItem(r.name+"\n"+
+                QString("%1  ·  %2 %3").arg(r.circular?"◉ circular":"— linear")
+                    .arg(QLocale().toString(n)).arg(d.alphabet=="Protein"?"aa":"bp"));
+            item->setData(Qt::UserRole,i);
+            item->setToolTip(r.name+"  ·  "+QString::number(n)+" residues");
+            item->setHidden(!item->text().contains(filterText,Qt::CaseInsensitive));
+            navigator_->addItem(item);
+        }
+        if(!d.records.isEmpty())navigator_->setCurrentRow(chosen);
+    }
+    notice_->setVisible(!d.warnings.isEmpty());
+    notice_->setText(d.warnings.join(" "));
+    updateSelection();
+    statusBar()->showMessage(QString("%1 sequences  ·  %2 columns  ·  DNA, protein and annotation workspaces")
+        .arg(d.records.size()).arg(helix::width(d)));
 }
-void Editor::updateSelection(){
-    if(model->document.records.isEmpty())return;
-    int row=activeRow();const auto &r=model->document.records[row];auto ranges=table->selectionModel()->selection();
-    QString pos=ranges.isEmpty()?"No selected cells":QString("Alignment columns %1–%2").arg(ranges.first().left()+1).arg(ranges.first().right()+1);
-    selection_->setText(QString("<b>%1</b><br><br>%2 residues<br>%3<br><br>GC: %4").arg(r.name.toHtmlEscaped()).arg(ungapped(r.sequence).size()).arg(pos).arg(model->document.alphabet=="Protein"?"n/a":number(gcPercent(r.sequence))));
-    map_->record=r;map_->alphabet=model->document.alphabet;map_->update();mapTitle_->setTextFormat(Qt::PlainText);mapTitle_->setText(r.name);
-    features_->clear();for(int i=0;i<r.features.size();++i){const auto &f=r.features[i];auto item=new QListWidgetItem(QString("%1\n%2–%3  %4").arg(f.name).arg(f.start+1).arg(f.end).arg(f.reverse?"←":"→"));item->setForeground(featureColor(i));features_->addItem(item);}
-    if(r.features.isEmpty()){auto item=new QListWidgetItem("No annotations\nAdd features from Sequence map.");item->setFlags(Qt::NoItemFlags);features_->addItem(item);}
+void Editor::updateSelection() {
+    const auto &doc=model->document;
+    if(doc.records.isEmpty())return;
+    const int row=qBound(0,activeRow(),int(doc.records.size())-1);
+    const auto &r=doc.records[row];
+    const auto ranges=table->selectionModel()->selection();
+    const QString pos=ranges.isEmpty()?"No selected cells"
+        :QString("Columns %1–%2").arg(ranges.first().left()+1).arg(ranges.first().right()+1);
+    selection_->setText(QString("<b>%1</b><br>%2 residues  ·  %3<br>GC: %4")
+        .arg(r.name.toHtmlEscaped()).arg(ungapped(r.sequence).size()).arg(pos)
+        .arg(doc.alphabet=="Protein"?"n/a":number(gcPercent(r.sequence))));
+    if(navigator_&&navigator_->currentRow()!=row) {
+        QSignalBlocker block(navigator_);
+        navigator_->setCurrentRow(row);
+    }
+    map_->record=r;
+    map_->alphabet=doc.alphabet;
+    map_->update();
+    mapTitle_->setTextFormat(Qt::PlainText);
+    mapTitle_->setText(QString("%1   ·   %2 %3   ·   %4")
+        .arg(r.name).arg(QLocale().toString(ungapped(r.sequence).size()))
+        .arg(doc.alphabet=="Protein"?"aa":"bp")
+        .arg(r.circular?"Circular":"Linear"));
+    features_->clear();
+    if(annotationTable_)annotationTable_->clear();
+    for(int i=0;i<r.features.size();++i) {
+        const auto &f=r.features[i];
+        auto item=new QListWidgetItem(QString("%1\n%2–%3  %4")
+            .arg(f.name).arg(f.start+1).arg(f.end).arg(f.reverse?"←":"→"));
+        item->setForeground(featureColor(i));features_->addItem(item);
+        if(annotationTable_) {
+            auto tree=new QTreeWidgetItem(annotationTable_,
+                QStringList{f.name,f.type,QString::number(f.start+1),
+                    QString::number(f.end),f.reverse?"Reverse":"Forward"});
+            tree->setData(0,Qt::UserRole,i);
+            tree->setForeground(0,featureColor(i));
+        }
+    }
+    if(r.features.isEmpty()) {
+        auto item=new QListWidgetItem("No annotations\nUse + Add feature to annotate.");
+        item->setFlags(Qt::NoItemFlags);features_->addItem(item);
+    }
+    if(enzymeList_) {
+        enzymeList_->clear();
+        if(doc.alphabet=="Protein") {
+            auto item=new QListWidgetItem("Restriction enzymes require nucleotide sequences");
+            item->setFlags(Qt::NoItemFlags);enzymeList_->addItem(item);
+        } else {
+            const auto sites=findRestrictionSites(r);
+            if(sites.isEmpty()) {
+                auto item=new QListWidgetItem("No exact recognition sites in the built-in eight-enzyme set");
+                item->setFlags(Qt::NoItemFlags);enzymeList_->addItem(item);
+            }
+            for(const auto &hit:sites) {
+                auto item=new QListWidgetItem(QString("%1   ·   position %2")
+                    .arg(hit.enzyme).arg(hit.start+1));
+                item->setData(Qt::UserRole,hit.start);
+                item->setToolTip("Double-click to select the recognition-site position in Sequence");
+                enzymeList_->addItem(item);
+            }
+        }
+        if(const auto *filter=findChild<QLineEdit*>("enzymeFilter")) {
+            for(int i=0;i<enzymeList_->count();++i)
+                enzymeList_->item(i)->setHidden(!enzymeList_->item(i)->text()
+                    .contains(filter->text(),Qt::CaseInsensitive));
+        }
+    }
 }
 void Editor::editResidue(int row,int col,QChar residue){if(busy())return;auto d=model->document;if(row<0||row>=d.records.size()||col<0||col>=d.records[row].sequence.size())return;if(d.records[row].sequence[col]==residue)return;
     if(d.alphabet!="Protein"&&!QString("ACGTURYSWKMBDHVN?-").contains(residue))return;
@@ -1103,7 +1199,7 @@ bool Editor::save(bool as){QString p=path_;if(as||p.isEmpty())p=QFileDialog::get
 void Editor::exportFile(){auto p=QFileDialog::getSaveFileName(this,"Export sequences (features and topology omitted)",{},"FASTA (*.fasta);;CLUSTAL (*.aln)");if(p.isEmpty())return;runSafely([&]{QString data=p.endsWith(".aln",Qt::CaseInsensitive)?clustal(model->document):fasta(model->document);QSaveFile f(p);if(!f.open(QIODevice::WriteOnly)||f.write(data.toUtf8())!=data.toUtf8().size()||!f.commit())throw std::runtime_error(f.errorString().toStdString());statusBar()->showMessage("Sequence-only export saved; project metadata is retained in .helix only.");});}
 void Editor::addSequence(){if(busy())return;QDialog dlg(this);dlg.setWindowTitle("Add a sequence");auto l=new QVBoxLayout(&dlg);auto name=new QLineEdit;name->setPlaceholderText("Sequence name");l->addWidget(name);auto seq=new QPlainTextEdit;seq->setPlaceholderText("Paste residues or a FASTA record");l->addWidget(seq);auto buttons=new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);l->addWidget(buttons);connect(buttons,&QDialogButtonBox::accepted,&dlg,&QDialog::accept);connect(buttons,&QDialogButtonBox::rejected,&dlg,&QDialog::reject);dlg.resize(480,310);if(dlg.exec()!=QDialog::Accepted)return;runSafely([&]{auto d=model->document;auto text=seq->toPlainText().trimmed();if(text.startsWith('>')){auto incoming=parseFasta(text);for(const auto &r:incoming.records)d.records.append(r);}else d.records.append(Record{name->text().trimmed(),validateSequence(text),{},false});commit(d,"Add sequence");});}
 void Editor::addFeature(){if(busy())return;int row=activeRow(),len=ungapped(model->document.records[row].sequence).size();QDialog dlg(this);dlg.setWindowTitle("Add feature · ungapped coordinates");auto l=new QFormLayout(&dlg);auto name=new QLineEdit;auto start=new QSpinBox;start->setRange(1,len);auto end=new QSpinBox;end->setRange(1,len);end->setValue(qMin(30,len));auto rev=new QCheckBox("Reverse strand");l->addRow("Label",name);l->addRow("Start (1-based, inclusive)",start);l->addRow("End (inclusive)",end);l->addRow(rev);auto b=new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);l->addRow(b);connect(b,&QDialogButtonBox::accepted,&dlg,&QDialog::accept);connect(b,&QDialogButtonBox::rejected,&dlg,&QDialog::reject);if(dlg.exec()!=QDialog::Accepted)return;runSafely([&]{if(name->text().trimmed().isEmpty()||end->value()<start->value())throw std::runtime_error("Enter a label and an end at or after the start.");auto d=model->document;d.records[row].features.append(Feature{name->text().trimmed(),"misc_feature",start->value()-1,end->value(),rev->isChecked()});commit(d,"Add feature");});}
-void Editor::selectFeature(int idx){const auto &r=model->document.records[activeRow()];if(idx<0||idx>=r.features.size())return;auto f=r.features[idx];int ungap=0,left=-1,right=-1;for(int i=0;i<r.sequence.size();++i)if(r.sequence[i]!='-'){if(ungap==f.start)left=i;if(ungap==f.end-1)right=i;++ungap;}if(left<0||right<0)return;int row=activeRow();QItemSelection sel(model->index(row,left),model->index(row,right));table->selectionModel()->select(sel,QItemSelectionModel::ClearAndSelect);table->scrollTo(model->index(row,left));tabs_->setCurrentIndex(0);}
+void Editor::selectFeature(int idx){const auto &r=model->document.records[activeRow()];if(idx<0||idx>=r.features.size())return;auto f=r.features[idx];int ungap=0,left=-1,right=-1;for(int i=0;i<r.sequence.size();++i)if(r.sequence[i]!='-'){if(ungap==f.start)left=i;if(ungap==f.end-1)right=i;++ungap;}if(left<0||right<0)return;int row=activeRow();QItemSelection sel(model->index(row,left),model->index(row,right));table->selectionModel()->select(sel,QItemSelectionModel::ClearAndSelect);table->scrollTo(model->index(row,left));tabs_->setCurrentIndex(1);}
 void Editor::showAnalysis(const QString &title,const QString &text){QDialog d(this);d.setWindowTitle(title);auto l=new QVBoxLayout(&d);auto view=new QPlainTextEdit;view->setReadOnly(true);view->setPlainText(text);l->addWidget(view);auto b=new QDialogButtonBox(QDialogButtonBox::Close);l->addWidget(b);connect(b,&QDialogButtonBox::rejected,&d,&QDialog::reject);d.resize(650,400);d.exec();}
 void Editor::translateSelected(){if(model->document.alphabet=="Protein"){QMessageBox::information(this,"Translate","Select DNA or RNA first.");return;}bool ok=false;int frame=QInputDialog::getInt(this,"Translation","Frame (standard genetic code, complete codons only)",1,1,3,1,&ok);if(!ok)return;runSafely([&]{const auto &r=model->document.records[activeRow()];showAnalysis("Translation",">"+r.name+" frame "+QString::number(frame)+"\n"+translate(r.sequence,frame-1)+"\n\nStandard code. Ambiguous codons → X. Trailing partial codons omitted. Stops → *. Full active row, not selected columns.");});}
 void Editor::findNext(){QString motif=search_->text().trimmed().toUpper();if(motif.isEmpty())return;if(motif.contains(QRegularExpression("[^A-Z*?-]"))){statusBar()->showMessage("Search uses exact residue symbols; no regular expressions.");return;}int row=activeRow();const auto &s=model->document.records[row].sequence;int from=table->currentIndex().isValid()?table->currentIndex().column()+1:0;int at=s.indexOf(motif,from);if(at<0)at=s.indexOf(motif);if(at<0){statusBar()->showMessage("No exact match in active row. Search does not cross a circular origin.");return;}table->setCurrentIndex(model->index(row,at));QItemSelection sel(model->index(row,at),model->index(row,at+motif.size()-1));table->selectionModel()->select(sel,QItemSelectionModel::ClearAndSelect);table->scrollTo(model->index(row,at));tabs_->setCurrentIndex(0);statusBar()->showMessage("Exact match at alignment column "+QString::number(at+1));}
