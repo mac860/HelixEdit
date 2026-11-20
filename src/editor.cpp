@@ -1,6 +1,7 @@
 #include "editor.h"
 #include "themes.h"
 #include "updater.h"
+#include "about_dialog.h"
 #include "orf.h"
 #include "restriction.h"
 #include "primer.h"
@@ -908,34 +909,11 @@ Editor::Editor(bool preview):preview_(preview) {
     settingsAction->setShortcut(QKeySequence("Ctrl+,"));
     settingsMenu->addAction("Update from GitHub source…",this,[this]{openSourceUpdater(this);});
     auto help=menuBar()->addMenu("&Help");
-    help->addAction("About HelixEdit",this,[this]{
-        QDialog dialog(this);
-        dialog.setObjectName("helixAboutDialog");
-        dialog.setWindowTitle("About HelixEdit");
-        dialog.setMinimumWidth(475);
-        auto layout=new QVBoxLayout(&dialog);
-        layout->setSpacing(12);
-        auto heading=new QLabel("<span style='font-size:23px;font-weight:700'>⬡ HelixEdit</span>   "
-            "<span style='font-size:12px'>"+QCoreApplication::applicationVersion()+" beta</span>");
-        layout->addWidget(heading);
-        auto description=new QLabel("Compact, offline-first DNA, RNA, protein and plasmid sequence studio.");
-        description->setWordWrap(true);layout->addWidget(description);
-        auto credit=new QLabel("<b>Developed and edited by Wael H</b><br>"
-            "Contact: <a href='mailto:waelye@gmail.com'>waelye@gmail.com</a><br>"
-            "GitHub repository: <a href='https://github.com/mac860/HelixEdit'>"
-            "https://github.com/mac860/HelixEdit</a>");
-        credit->setTextFormat(Qt::RichText);
-        credit->setTextInteractionFlags(Qt::TextBrowserInteraction);
-        credit->setOpenExternalLinks(true);
-        credit->setWordWrap(true);layout->addWidget(credit);
-        auto disclaimer=new QLabel("Independent open-source beta, not affiliated with BioEdit or "
-            "SnapGene. Validate scientific analyses before research use. "
-            "No proprietary third-party application assets are included.");
-        disclaimer->setWordWrap(true);layout->addWidget(disclaimer);
-        auto buttons=new QDialogButtonBox(QDialogButtonBox::Close);
-        connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
-        layout->addWidget(buttons);
-        dialog.exec();
+    help->addAction("About HelixEdit",this,[this]{showAboutDialog(this);});
+    help->addAction("Document notices…",this,[this]{
+        const QStringList notes=model->document.warnings;
+        QMessageBox::information(this,"Document notices",
+            notes.isEmpty()?"No document notices.":notes.join("\n\n"));
     });
     auto bar=addToolBar("Quick actions");
     bar->setObjectName("quickActions");
