@@ -57,6 +57,67 @@ private slots:
         auto f=d.records[0].features[0];QCOMPARE(f.start,1);QCOMPARE(f.end,9);QVERIFY(f.reverse);QCOMPARE(f.name,QString("rev"));QVERIFY(d.warnings.join(" ").contains("Unsupported"));
         input.replace("12 bp","13 bp");QVERIFY_EXCEPTION_THROWN(parseGenBank(input),std::runtime_error);
     }
+    void addgeneGenBankUrlAndUnquotedLabels() {
+        // Addgene/SnapGene exports include URLs containing // in COMMENT lines.
+        // Only a standalone // terminates a GenBank record.
+        const QString input=
+            "LOCUS       sequence-438456-        24 bp    DNA     circular SYN 04-SEP-2026\r\n"
+            "DEFINITION  Teaching fixture for Addgene-style annotations.\r\n"
+            "COMMENT     Exported from https://www.snapgene.com\r\n"
+            "FEATURES             Location/Qualifiers\r\n"
+            "     rep_origin      complement(2..7)\r\n"
+            "                     /label=ori\r\n"
+            "     promoter        9..18\r\n"
+            "                     /label=AmpR promoter\r\n"
+            "     misc_feature    19..24\r\n"
+            "                     /label=\"quoted feature\"\r\n"
+            "ORIGIN\r\n"
+            "        1 acgtacgtac gtacgtacgt acgt\r\n"
+            "//\r\n";
+        const Document d=parseGenBank(input);
+        QCOMPARE(d.records.size(),1);
+        QCOMPARE(d.alphabet,QString("DNA"));
+        QCOMPARE(d.records[0].name,QString("sequence-438456-"));
+        QVERIFY(d.records[0].circular);
+        QCOMPARE(d.records[0].sequence,QString("ACGTACGTACGTACGTACGTACGT"));
+        QCOMPARE(d.records[0].features.size(),3);
+        QCOMPARE(d.records[0].features[0].name,QString("ori"));
+        QVERIFY(d.records[0].features[0].reverse);
+        QCOMPARE(d.records[0].features[1].name,QString("AmpR promoter"));
+        QCOMPARE(d.records[0].features[2].name,QString("quoted feature"));
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString path=directory.filePath("addgene-plasmid-10878.gbk");
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        const QByteArray bytes=input.toUtf8();
+        QCOMPARE(file.write(bytes),qint64(bytes.size()));
+        file.close();
+        const Document imported=readDocument(path);
+        QCOMPARE(imported.records[0].sequence,d.records[0].sequence);
+        QCOMPARE(imported.records[0].features[1].name,QString("AmpR promoter"));
+        const QString malformed="LOCUS       missing 3 bp DNA circular\n"
+            "COMMENT     https://www.snapgene.com\n//\n";
+        QVERIFY_EXCEPTION_THROWN(parseGenBank(malformed),std::runtime_error);
+    }
+    void fastaWithBomAndComments() {
+        const QString text=QString(QChar(0xFEFF))+
+            "# exported sequence\n>protein_or_DNA\nacgtacgt\n; optional comment\n"
+            ">second\nTTGGCCAA\n";
+        const Document d=parseFasta(text);
+        QCOMPARE(d.records.size(),2);
+        QCOMPARE(d.records[0].sequence,QString("ACGTACGT"));
+        QCOMPARE(d.records[1].sequence,QString("TTGGCCAA"));
+        QTemporaryDir tmp;
+        QVERIFY(tmp.isValid());
+        const QString path=tmp.filePath("records.fasta");
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(text.toUtf8());file.close();
+        const Document imported=readDocument(path);
+        QCOMPARE(imported.records.size(),2);
+        QCOMPARE(imported.records[0].name,QString("protein_or_DNA"));
+    }
     void fastaTopologyRequiresVerification() {
         auto d=parseFasta(">Addgene_NGS_Result\nGGCGCTCTTCCGCTTCCTCGCTCACTGACTCGCTGCGCTCGGTCGTTCGGCTGCGGCGAGCGGTATCAGCTCACTCAAAGGCGGTAATACGGTTATCCACAGAATCAGGGGATAACGCAGGAAAGAACATG\n");
         QCOMPARE(d.records.size(),1);
