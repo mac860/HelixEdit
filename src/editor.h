@@ -25,6 +25,10 @@ public:
     explicit MapView(QWidget *p=nullptr):QWidget(p){ setMinimumSize(400,330); }
     Record record;
     QString alphabet="DNA";
+    bool showEnzymes=true;
+    bool showFeatures=true;
+    qreal zoom=1.0;
+    void setZoom(qreal value) {zoom=qBound<qreal>(0.65,value,1.35);update();}
     void draw(QPainter &p,const QRectF &bounds) const;
 protected:
     void paintEvent(QPaintEvent *) override;
@@ -54,6 +58,9 @@ private:
     MapView *map_;
     QLabel *stats_,*selection_,*notice_,*mapTitle_;
     QListWidget *features_;
+    QListWidget *navigator_=nullptr;
+    QListWidget *enzymeList_=nullptr;
+    QTreeWidget *annotationTable_=nullptr;
     QComboBox *molecule_;
     QLineEdit *search_;
     QPlainTextEdit *log_;
