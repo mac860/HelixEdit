@@ -1712,9 +1712,8 @@ Editor::Editor(bool preview):preview_(preview) {
     connect(explorerAction,&QAction::toggled,toggleProject,&QToolButton::setChecked);
     auto selectWorkspace=[=](int index) {
         const int mode=(index==1?0:(index==0||index==2||index==3||index==4?1:2));
-        const QToolButton *choices[]={activitySequence,activityPlasmid,activityAnalysis};
-        for(int j=0;j<3;++j)
-            const_cast<QToolButton*>(choices[j])->setChecked(mode==j);
+        QToolButton *choices[]={activitySequence,activityPlasmid,activityAnalysis};
+        for(int j=0;j<3;++j)choices[j]->setChecked(mode==j);
         contextStack->setCurrentIndex(mode);
         const QString roles[]={"sequence","plasmid","analysis"};
         const QString titles[]={"SEQUENCE","PLASMID","ANALYSIS"};
