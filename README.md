@@ -10,6 +10,18 @@ Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing wor
 
 ![HelixEdit alignment editor](docs/alignment.png)
 
+## Three scientific workspaces (development roadmap)
+
+HelixEdit is being developed around three connected, offline-first workspaces. The capabilities below combine existing 0.1.x tools with **planned enhancements**, not a claim that all are already available.
+
+| Workspace | Focus | Roadmap |
+|---|---|---|
+| **Sequence Studio** | Multiple-sequence alignment, accessible residue coloring, DNA/protein translation, six-frame ORF discovery, primer mapping and annotation editing | [Detailed specification](ROADMAP.md#1-sequence-studio--alignment-translation-and-sequence-editing) |
+| **Plasmid Studio** | Interactive circular/linear maps, restriction analysis, cloning simulations, rich GenBank compatibility, primer binding sites and feature tracks | [Detailed specification](ROADMAP.md#2-plasmid-studio--maps-restriction-analysis-and-cloning) |
+| **Analysis Studio** | Optional local MAFFT, MUSCLE and BLAST+ tools, sequence statistics, distance matrices and later phylogenetic inference | [Detailed specification](ROADMAP.md#3-analysis-studio--reproducible-local-bioinformatics) |
+
+The full [scientific development roadmap](ROADMAP.md) defines user workflows, acceptance criteria, testing requirements and staged releases. Existing alignment and map functionality remains available; advanced ORF, cloning, BLAST UI and phylogenetics features are not yet shipped.
+
 ## Available now
 
 - Pastel nucleotide colours and grouped amino-acid colours, compact workspace, alignment/map/tools tabs.
