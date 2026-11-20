@@ -1,7 +1,17 @@
 #include "editor.h"
+#include <QtSvg/QSvgRenderer>
+#include <QPainter>
 int main(int argc,char **argv){
     QApplication app(argc,argv);QCoreApplication::setOrganizationName("HelixEdit");QCoreApplication::setApplicationName("HelixEdit");QCoreApplication::setApplicationVersion("0.1.3");
-    QApplication::setWindowIcon(QIcon(":/packaging/helixedit.svg"));
+    // Match GNOME/Wayland desktop launcher and draw SVG into a guaranteed native icon.
+    QGuiApplication::setDesktopFileName("org.helixedit.desktop");
+    QPixmap appLogo(128,128);appLogo.fill(Qt::transparent);
+    QSvgRenderer logoRenderer(QStringLiteral(":/packaging/helixedit.svg"));
+    if(logoRenderer.isValid()){
+        QPainter logoPainter(&appLogo);
+        logoRenderer.render(&logoPainter);
+    }
+    QApplication::setWindowIcon(logoRenderer.isValid()?QIcon(appLogo):QIcon(":/packaging/helixedit.svg"));
     QCommandLineParser parser;parser.setApplicationDescription("Compact, offline sequence studio");parser.addHelpOption();parser.addVersionOption();
     parser.addPositionalArgument("file","FASTA, CLUSTAL, GenBank or .helix project");
     parser.addOption({"screenshot","Render the synthetic demo offscreen to a PNG and exit.","path"});
