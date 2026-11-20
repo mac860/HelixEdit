@@ -231,6 +231,28 @@ inline QString themeStyle(const QString &name) {
       QFrame#activityRail QToolButton:hover {
         background:%10;border-color:%5;
       }
+      QFrame#activityRail QToolButton#toggleWorkspaceTools,
+      QFrame#activityRail QToolButton#toggleProjectExplorer {
+        border:1px solid %5;
+        border-radius:13px;
+        background:%10;
+        padding:4px;
+      }
+      QFrame#activityRail QToolButton#toggleWorkspaceTools:checked,
+      QFrame#activityRail QToolButton#toggleProjectExplorer:checked {
+        border:2px solid %7;
+        background:qlineargradient(x1:0,y1:0,x2:1,y2:1,
+            stop:0 rgba(85,202,255,80),stop:1 rgba(169,95,255,65));
+      }
+      QFrame#activityRail QToolButton#toggleWorkspaceTools:hover,
+      QFrame#activityRail QToolButton#toggleProjectExplorer:hover {
+        border:2px solid %7;
+      }
+      QFrame#activityRail QFrame#activityRailDivider {
+        background:%5;
+        max-height:1px;
+        border:0;
+      }
       QToolButton#activitySequence:checked {
         background:rgba(0,168,255,62);border:2px solid #009FFC;
         color:%8;font-weight:800;
