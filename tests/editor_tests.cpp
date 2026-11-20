@@ -1,6 +1,7 @@
 #include "editor.h"
 #include "themes.h"
 #include "source_discovery.h"
+#include <QtSvg/QSvgRenderer>
 #include <QtTest>
 using namespace helix;
 class EditorTests:public QObject {
@@ -54,6 +55,22 @@ private slots:
             QCOMPARE(int(editor.model->document.records.size()),specs[i].count);
             QCOMPARE(editor.currentPath(),QString());
         }
+    }
+    void themeAwareSequenceColorsAndBundledIcon() {
+        const QString previous=savedTheme();
+        Editor editor(true);
+        const QModelIndex item=editor.model->index(0,0);
+        QVERIFY(item.isValid());
+        applyTheme("Light");
+        const QColor light=editor.model->data(item,Qt::BackgroundRole).value<QColor>();
+        applyTheme("Dark");
+        const QColor dark=editor.model->data(item,Qt::BackgroundRole).value<QColor>();
+        QVERIFY(light.isValid());
+        QVERIFY(dark.isValid());
+        QVERIFY2(light!=dark,"Residues should use distinct light and dark color palettes");
+        QSvgRenderer icon(QStringLiteral(":/packaging/helixedit.svg"));
+        QVERIFY2(icon.isValid(),"The original SVG icon must be embedded in Qt resources");
+        applyTheme(previous);
     }
     void graphicalStatisticsDashboard() {
         Editor editor(true);
