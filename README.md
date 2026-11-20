@@ -4,11 +4,30 @@
 
 Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
 
-**Status: 0.1.8 beta development on `main` (new GUI compilation/CI verification pending).** The compact workspace and About dialog changes are committed with GUI regression checks; native Ubuntu and macOS builds of this version still need to pass.
+**Status: 0.1.9 beta development on `main` (native Ubuntu/CI verification pending).** The new Debian install helper avoids APT's unsandboxed-root notice by safely staging local packages; core app functionality remains unchanged.
 
 ![HelixEdit sequence map](docs/map.png)
 
 ![HelixEdit alignment editor](docs/alignment.png)
+
+## New in 0.1.9: sandbox-friendly Ubuntu DEB installation
+
+An Ubuntu 26.04 installation log showed **successful installation of HelixEdit 0.1.8**, followed by the informational APT notice: `Download is performed unsandboxed as root ... couldn't be accessed by user '_apt'` (`pkgAcquire::Run (13: Permission denied)`). This happens when the restricted `_apt` account cannot traverse a private path under `~/Downloads`; it **does not mean the HelixEdit package failed to install**.
+
+**Fixed installation workflow:** run `bash scripts/install_ubuntu_deb.sh` from the Git checkout after building. This helper verifies the package name and architecture, copies the .deb into a securely created, world-readable **temporary directory under /tmp** with 0755/0644 access, installs through `sudo apt-get`, and automatically deletes the temporary package. It never changes permissions on your home folder or project and does not disable the APT sandbox. The **in-app GitHub updater** now uses the same staging helper before its `pkexec` installation request.
+
+The build script includes an unprivileged, mocked-APT test of the staging permissions and cleanup, and the CI workflow syntax-checks both new shell scripts. The first upgrade from an older version may need a terminal install using this helper; after installing 0.1.9 the in-app updater uses the new workflow.
+
+**Standard Ubuntu commands:**
+
+```bash
+cd ~/Downloads/v3/HelixEdit
+git pull --ff-only origin main
+bash scripts/build_ubuntu_deb.sh
+bash scripts/install_ubuntu_deb.sh
+```
+
+No `sudo` is needed before the final install step handled inside the helper. See [Debian installation notes](docs/INSTALL_019.md).
 
 ## New in 0.1.8: compact scientific workspace and redesigned About
 
@@ -181,14 +200,16 @@ git pull --ff-only origin main
 bash scripts/build_ubuntu_deb.sh
 ```
 
-The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.8-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
+The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.9-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
 
-Install the generated package (use the exact path printed by the script):
+Install the generated package through the sandbox-friendly installer:
 
 ```bash
-sudo apt install --reinstall ./build-ubuntu-amd64/HelixEdit-0.1.8-x86_64.deb
+bash scripts/install_ubuntu_deb.sh
 helixedit
 ```
+
+An explicit package path is also supported: `bash scripts/install_ubuntu_deb.sh ./build-ubuntu-amd64/HelixEdit-0.1.9-x86_64.deb`. Avoid invoking `sudo` on the helper itself: it builds a temporary APT-readable copy as your normal user and asks for sudo only when installing.
 
 **If a build fails**, copy the first `error:` message and the final 50 lines from the newest `build-logs/build-amd64-*.log` file. Do not run CMake with `sudo`, reuse an old CMake cache from a different Qt version, or run `cpack` before compilation completes.
 
