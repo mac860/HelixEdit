@@ -67,5 +67,7 @@ for required in \
   fi
 done
 echo "Launcher, icons, examples and updater are present in the package."
+echo "Checking that the DEB installer uses _apt-readable temporary staging..."
+bash "$ROOT/scripts/test_install_staging.sh" "$EXPECTED_PACKAGE"
 echo "Inspect with: dpkg-deb --info '$EXPECTED_PACKAGE'"
 echo "Install without the _apt sandbox notice: bash scripts/install_ubuntu_deb.sh"
