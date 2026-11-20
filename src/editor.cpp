@@ -546,19 +546,77 @@ Editor::Editor(bool preview):preview_(preview) {
     });
     analysis->addAction("Sequence statistics…",this,[this]{
         const auto &d=model->document;
-        QString report="SEQUENCE STATISTICS\n";
-        report+="Molecule type: "+d.alphabet+"\nRecord count: "+QString::number(d.records.size())+
-                "\nAlignment width: "+QString::number(helix::width(d))+"\n\n";
-        for(const auto &r:d.records){
-            const auto x=sequenceStatistics(r,d.alphabet);
-            report+=QString("%1\n  ungapped=%2  columns=%3  gaps=%4  ambiguous=%5  GC=%6\n")
-                .arg(r.name).arg(x.ungappedLength).arg(x.alignmentLength)
-                .arg(x.gaps).arg(x.ambiguous)
-                .arg(x.gc<0?"NA":QString::number(x.gc,'f',2)+"%");
+        QDialog dialog(this);
+        dialog.setWindowTitle("HelixEdit · Sequence statistics");
+        dialog.resize(940,520);
+        auto layout=new QVBoxLayout(&dialog);
+        auto heading=new QLabel(QString(
+            "<b style='font-size:18px'>Sequence composition & statistics</b><br>"
+            "<span style='color:#8496ae'>%1 records · %2 · %3 alignment columns</span>")
+            .arg(d.records.size()).arg(d.alphabet).arg(helix::width(d)));
+        heading->setObjectName("statisticsDashboardTitle");
+        layout->addWidget(heading);
+        auto table=new QTableWidget(d.records.size(),6,&dialog);
+        table->setObjectName("sequenceStatisticsTable");
+        table->setHorizontalHeaderLabels({"Sequence","Residues","Columns","Gaps","Ambiguous","GC %"});
+        table->setAlternatingRowColors(true);
+        table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        table->setSelectionBehavior(QAbstractItemView::SelectRows);
+        table->verticalHeader()->hide();
+        table->horizontalHeader()->setSectionResizeMode(0,QHeaderView::Stretch);
+        for(int col=1;col<6;++col)table->horizontalHeader()->setSectionResizeMode(
+            col,col==5?QHeaderView::Interactive:QHeaderView::ResizeToContents);
+        table->setColumnWidth(5,170);
+        QString tsv="Sequence\tResidues\tColumns\tGaps\tAmbiguous\tGC percent\n";
+        for(int row=0;row<d.records.size();++row) {
+            const auto &record=d.records[row];
+            const auto st=sequenceStatistics(record,d.alphabet);
+            const QStringList fields={record.name,QString::number(st.ungappedLength),
+                QString::number(st.alignmentLength),QString::number(st.gaps),
+                QString::number(st.ambiguous)};
+            for(int col=0;col<fields.size();++col) {
+                auto cell=new QTableWidgetItem(fields[col]);
+                if(col>0)cell->setTextAlignment(Qt::AlignCenter);
+                table->setItem(row,col,cell);
+            }
+            if(st.gc>=0) {
+                auto bar=new QProgressBar(table);
+                bar->setObjectName("gcBar");
+                bar->setRange(0,100);bar->setValue(qBound(0,qRound(st.gc),100));
+                bar->setFormat(QString::number(st.gc,'f',1)+"% GC");
+                bar->setStyleSheet(
+                    "QProgressBar {border:1px solid #91bfdf;border-radius:7px;"
+                    "background:#eaf4fd;color:#223f55;text-align:center;font-weight:600;}"
+                    "QProgressBar::chunk {background:qlineargradient(x1:0,y1:0,x2:1,y2:0,"
+                    "stop:0 #3bc9a7,stop:1 #5a97f3);border-radius:6px;}");
+                table->setCellWidget(row,5,bar);
+            } else {
+                auto cell=new QTableWidgetItem("N/A");
+                cell->setTextAlignment(Qt::AlignCenter);
+                table->setItem(row,5,cell);
+            }
+            tsv+=QString("%1\t%2\t%3\t%4\t%5\t%6\n")
+                .arg(record.name).arg(st.ungappedLength).arg(st.alignmentLength)
+                .arg(st.gaps).arg(st.ambiguous)
+                .arg(st.gc<0?"NA":QString::number(st.gc,'f',2));
         }
-        showAnalysis("Sequence statistics",report);
+        layout->addWidget(table,1);
+        auto explanation=new QLabel("Counts exclude alignment gaps from residue length. "
+            "Nucleotide GC% uses defined A/C/G/T/U bases; protein GC% is not applicable. "
+            "This view does not infer relatedness or phylogenetic distance.");
+        explanation->setWordWrap(true);layout->addWidget(explanation);
+        auto actions=new QHBoxLayout;
+        auto copyTable=new QPushButton("Copy TSV data");
+        connect(copyTable,&QPushButton::clicked,&dialog,[tsv]{
+            QGuiApplication::clipboard()->setText(tsv);
+        });
+        actions->addWidget(copyTable);actions->addStretch();
+        auto buttons=new QDialogButtonBox(QDialogButtonBox::Close);
+        connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
+        actions->addWidget(buttons);layout->addLayout(actions);
+        dialog.exec();
     });
-    analysis->addAction("p-distance matrix…",this,[this]{
+        analysis->addAction("p-distance matrix…",this,[this]{
         runSafely([&]{
             const auto matrix=pDistanceMatrix(model->document);
             QString report="Uncorrected p-distance: mismatches / compared non-gap, non-? columns.\n"
