@@ -128,7 +128,7 @@ QString genbank(const Document &d) {
             QString label=f.name;
             label.replace('"','\'');
             label.replace('\n',' ');
-            label.replace('\\r',' ');
+            label.replace('\r',' ');
             out+="                     /label=\""+label+"\"\n";
         }
         out+="ORIGIN\n";
