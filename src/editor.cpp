@@ -1672,6 +1672,9 @@ void Editor::updateSelection() {
 void Editor::editResidue(int row,int col,QChar residue){if(busy())return;auto d=model->document;if(row<0||row>=d.records.size()||col<0||col>=d.records[row].sequence.size())return;if(d.records[row].sequence[col]==residue)return;
     if(d.alphabet!="Protein"&&!QString("ACGTURYSWKMBDHVN?-").contains(residue))return;
     if((residue=='-')!=(d.records[row].sequence[col]=='-'))d.records[row].features.clear();
+    if(!d.records[row].features.isEmpty() &&
+       !d.warnings.contains("Sequence modified: reverify imported or manually assigned feature function against the edited bases."))
+        d.warnings << "Sequence modified: reverify imported or manually assigned feature function against the edited bases.";
     d.records[row].sequence[col]=residue;commit(d,"Replace residue");table->setCurrentIndex(model->index(row,col));}
 void Editor::gapColumns(bool insert){if(busy())return;auto ranges=table->selectionModel()->selection();if(ranges.size()!=1){QMessageBox::information(this,"Selection","Select one contiguous rectangle first.");return;}auto range=ranges.first();
     if(!insert && !preview_ && QMessageBox::question(this,"Delete columns","Delete the selected alignment columns from the selected rows? Features on changed rows will be cleared. Undo is available.")!=QMessageBox::Yes)return;
@@ -1708,8 +1711,7 @@ void Editor::importMatchingGenBankAnnotations() {
            QMessageBox::question(this,"Replace annotations",
                "The active sequence already has annotations. Replace them with the exact-sequence-matched GenBank features?",
                QMessageBox::Yes|QMessageBox::No)!=QMessageBox::Yes)return;
-        active.features=source.features;
-        active.circular=source.circular;
+        attachExactGenBankAnnotations(next,activeRow(),imported);
         next.warnings+=imported.warnings;
         next.warnings.append("Feature labels imported from "+QFileInfo(path).fileName()+
             " after exact nucleotide equality. Reverify biological function and provenance against the original source.");
