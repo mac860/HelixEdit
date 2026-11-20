@@ -1594,6 +1594,22 @@ void Editor::showSettings() {
     mapFeatures->setChecked(stored.value("map/showFeatures",true).toBool());
     mapLayout->addWidget(mapEnzymes);
     mapLayout->addWidget(mapFeatures);
+    auto strandHeading=new QLabel("<b>Sequence strand display</b>");
+    mapLayout->addWidget(strandHeading);
+    auto wrapPreference=new QCheckBox("Wrap active sequence to window width");
+    wrapPreference->setObjectName("wrapToWindowPreference");
+    wrapPreference->setChecked(stored.value("sequence/wrapToWindow",true).toBool());
+    wrapPreference->setToolTip("Automatically reflow bases when the Sequence panel is resized.");
+    mapLayout->addWidget(wrapPreference);
+    auto complementPreference=new QCheckBox("Show complementary DNA/RNA strand in wrapped view");
+    complementPreference->setObjectName("complementPreference");
+    complementPreference->setChecked(stored.value("sequence/showComplement",true).toBool());
+    mapLayout->addWidget(complementPreference);
+    auto featureTrackPreference=new QCheckBox("Show feature tracks in wrapped view");
+    featureTrackPreference->setObjectName("featureTrackPreference");
+    featureTrackPreference->setChecked(stored.value("sequence/showFeatures",true).toBool());
+    mapLayout->addWidget(featureTrackPreference);
+
     auto zoomForm=new QFormLayout;
     auto zoomRow=new QWidget;
     auto zoomLayout=new QHBoxLayout(zoomRow);
@@ -1623,7 +1639,7 @@ void Editor::showSettings() {
     mapLayout->addLayout(zoomForm);
     auto mapNote=new QLabel("Changes to a named .helix project are periodically saved. "
         "An independent local recovery copy is retained. FASTA/GenBank originals are not overwritten. "
-        "Map visibility controls remain available for quick adjustments in the Map tab.");
+        "Map and wrapped-sequence visibility controls are also available directly in their tabs.");
     mapNote->setWordWrap(true);
     mapLayout->addWidget(mapNote);
     mapLayout->addStretch();
@@ -1728,6 +1744,9 @@ void Editor::showSettings() {
         startPage->setCurrentText("Map");
         mapEnzymes->setChecked(true);
         mapFeatures->setChecked(true);
+        wrapPreference->setChecked(true);
+        complementPreference->setChecked(true);
+        featureTrackPreference->setChecked(true);
         zoom->setValue(100);
         autosave->setCurrentIndex(0);
         for(auto *field:toolFields)field->clear();
@@ -1762,6 +1781,9 @@ void Editor::showSettings() {
         settings.setValue("workspace/startTab",startPage->currentText());
         settings.setValue("map/showEnzymes",mapEnzymes->isChecked());
         settings.setValue("map/showFeatures",mapFeatures->isChecked());
+        settings.setValue("sequence/wrapToWindow",wrapPreference->isChecked());
+        settings.setValue("sequence/showComplement",complementPreference->isChecked());
+        settings.setValue("sequence/showFeatures",featureTrackPreference->isChecked());
         settings.setValue("map/defaultZoom",zoom->value());
         settings.setValue("editing/autosaveSeconds",autosave->currentData().toInt());
         settings.setValue("updater/source",sourceFolder);
@@ -1770,6 +1792,9 @@ void Editor::showSettings() {
         applyTheme(theme->currentText());
         if(mapEnzymeToggle_)mapEnzymeToggle_->setChecked(mapEnzymes->isChecked());
         if(mapFeatureToggle_)mapFeatureToggle_->setChecked(mapFeatures->isChecked());
+        if(wrapToggle_)wrapToggle_->setChecked(wrapPreference->isChecked());
+        if(complementToggle_)complementToggle_->setChecked(complementPreference->isChecked());
+        if(wrappedFeaturesToggle_)wrappedFeaturesToggle_->setChecked(featureTrackPreference->isChecked());
         if(map_) {map_->setZoom(zoom->value()/100.0);map_->update();}
         if(autosave_)autosave_->setInterval(autosave->currentData().toInt()*1000);
         dialog.accept();
