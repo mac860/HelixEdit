@@ -986,8 +986,104 @@ Editor::Editor(bool preview):preview_(preview) {
     auto root=new QWidget;setCentralWidget(root);
     auto layout=new QVBoxLayout(root);
     layout->setContentsMargins(4,3,4,3);layout->setSpacing(2);
-    // Compact, category-based ribbon: each button triggers the existing menu action,
-    // keeping keyboard shortcuts, enablement and behavior in one place.
+    // HelixEdit 0.2: dedicated left activity rail and per-workspace tool panels.
+    // Existing QAction objects remain the single source of command behavior.
+    auto workspaceRow=new QHBoxLayout;
+    workspaceRow->setContentsMargins(0,0,0,0);
+    workspaceRow->setSpacing(7);
+    layout->addLayout(workspaceRow,1);
+
+    auto activityRail=new QFrame(root);
+    activityRail->setObjectName("activityRail");
+    activityRail->setFixedWidth(75);
+    auto activityLayout=new QVBoxLayout(activityRail);
+    activityLayout->setContentsMargins(4,9,4,7);
+    activityLayout->setSpacing(8);
+    auto activityGroup=new QButtonGroup(activityRail);
+    activityGroup->setExclusive(true);
+    auto iconForMode=[](const QString &glyph,const QColor &color){
+        QPixmap pixmap(52,52);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing,true);
+        const QRectF tile(3,3,46,46);
+        QLinearGradient gradient(tile.topLeft(),tile.bottomRight());
+        gradient.setColorAt(0,color.lighter(118));
+        gradient.setColorAt(1,color.darker(115));
+        painter.setBrush(gradient);
+        painter.setPen(QPen(QColor(255,255,255,95),1.25));
+        painter.drawRoundedRect(tile,14,14);
+        QFont font=painter.font();
+        font.setFamily("DejaVu Sans");
+        font.setPointSize(glyph.size()>1?15:23);
+        font.setBold(true);
+        painter.setFont(font);
+        painter.setPen(Qt::white);
+        painter.drawText(tile,Qt::AlignCenter,glyph);
+        return QIcon(pixmap);
+    };
+    auto addActivity=[&](const QString &title,const QString &glyph,
+                         const QString &role,const QColor &color){
+        auto button=new QToolButton(activityRail);
+        button->setObjectName("activity"+title);
+        button->setProperty("workspaceRole",role);
+        button->setCheckable(true);
+        button->setAutoRaise(false);
+        button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+        button->setIcon(iconForMode(glyph,color));
+        button->setIconSize(QSize(35,35));
+        button->setText(title);
+        button->setToolTip(title+" workspace");
+        button->setFixedSize(65,69);
+        activityGroup->addButton(button);
+        activityLayout->addWidget(button);
+        return button;
+    };
+    auto activitySequence=addActivity("Sequence","AT","sequence",QColor("#009CF5"));
+    auto activityPlasmid=addActivity("Plasmid","◉","plasmid",QColor("#A34CFA"));
+    auto activityAnalysis=addActivity("Analysis","Σ","analysis",QColor("#04B888"));
+    activityLayout->addStretch(1);
+    auto toggleTools=new QToolButton(activityRail);
+    toggleTools->setObjectName("toggleWorkspaceTools");
+    toggleTools->setIcon(style()->standardIcon(QStyle::SP_ToolBarHorizontalExtensionButton));
+    toggleTools->setIconSize(QSize(20,20));
+    toggleTools->setCheckable(true);
+    toggleTools->setChecked(true);
+    toggleTools->setFixedSize(65,37);
+    toggleTools->setToolTip("Show or hide the workspace tools panel");
+    activityLayout->addWidget(toggleTools);
+    auto toggleProject=new QToolButton(activityRail);
+    toggleProject->setObjectName("toggleProjectExplorer");
+    toggleProject->setIcon(style()->standardIcon(QStyle::SP_DirHomeIcon));
+    toggleProject->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    toggleProject->setToolTip("Show or hide the sequence/project explorer");
+    toggleProject->setCheckable(true);
+    toggleProject->setFixedSize(65,37);
+    activityLayout->addWidget(toggleProject);
+    workspaceRow->addWidget(activityRail);
+
+    auto toolPanel=new QFrame(root);
+    toolPanel->setObjectName("workspaceToolPanel");
+    toolPanel->setFixedWidth(194);
+    toolPanel->setProperty("activeWorkspace","sequence");
+    auto toolPanelLayout=new QVBoxLayout(toolPanel);
+    toolPanelLayout->setContentsMargins(7,10,7,8);
+    toolPanelLayout->setSpacing(7);
+    auto toolPanelTitle=new QLabel("SEQUENCE",toolPanel);
+    toolPanelTitle->setObjectName("workspacePanelTitle");
+    toolPanelLayout->addWidget(toolPanelTitle);
+    auto toolPanelSubtitle=new QLabel("Editing tools",toolPanel);
+    toolPanelSubtitle->setObjectName("workspacePanelSubtitle");
+    toolPanelLayout->addWidget(toolPanelSubtitle);
+    auto contextStack=new QStackedWidget(toolPanel);
+    contextStack->setObjectName("workspaceToolStack");
+    toolPanelLayout->addWidget(contextStack,1);
+    workspaceRow->addWidget(toolPanel);
+    connect(toggleTools,&QToolButton::toggled,toolPanel,&QWidget::setVisible);
+
+    QVector<QVBoxLayout*> contextLayouts;
+    // Retain a hidden, non-rendered ribbon as a compatibility target for older
+    // tests and actions; the live commands now render in the left tool panel.
     auto ribbon=new QTabWidget(root);
     ribbon->setObjectName("commandRibbon");
     ribbon->setDocumentMode(true);
@@ -1018,6 +1114,40 @@ Editor::Editor(bool preview):preview_(preview) {
         }
         row->addStretch(1);
         ribbon->addTab(page,name);
+        auto toolScroll=new QScrollArea(contextStack);
+        toolScroll->setObjectName("workspaceTools"+name);
+        toolScroll->setFrameShape(QFrame::NoFrame);
+        toolScroll->setWidgetResizable(true);
+        toolScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        auto toolContent=new QWidget(toolScroll);
+        toolContent->setObjectName("workspaceToolsContent");
+        auto vertical=new QVBoxLayout(toolContent);
+        vertical->setContentsMargins(2,3,2,5);
+        vertical->setSpacing(5);
+        auto navHeading=new QLabel("VIEWS",toolContent);
+        navHeading->setObjectName("workspaceGroupHeading");
+        vertical->addWidget(navHeading);
+        auto commandHeading=new QLabel("TOOLS & ACTIONS",toolContent);
+        commandHeading->setObjectName("workspaceGroupHeading");
+        vertical->addWidget(commandHeading);
+        for(const auto &command:commands) {
+            if(!command.second)continue;
+            auto button=new QToolButton(toolContent);
+            button->setObjectName("contextAction"+name);
+            button->setProperty("workspaceRole",name.toLower());
+            button->setDefaultAction(command.second);
+            button->setText(command.first);
+            button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            button->setIconSize(QSize(17,17));
+            button->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Fixed);
+            button->setMinimumHeight(34);
+            button->setToolTip(command.second->text());
+            vertical->addWidget(button);
+        }
+        vertical->addStretch(1);
+        toolScroll->setWidget(toolContent);
+        contextLayouts.append(vertical);
+        contextStack->addWidget(toolScroll);
     };
     auto findMenuAction=[](QMenu *menu,const QString &label)->QAction*{
         for(auto *action:menu->actions())if(action->text()==label)return action;
@@ -1064,7 +1194,7 @@ Editor::Editor(bool preview):preview_(preview) {
                                  {"Restriction",restrictA},{"Export GB",gbExportA},{"Assemble",assemblyA}});
     addRibbonCategory("Analysis",{{"MAFFT",mafftA},{"MUSCLE",muscleA},{"BLAST+",blastA},
                                   {"Consensus",consensusA},{"Matrix",matrixA},{"p-distance",distanceA},{"Statistics",statsA},{"PHYLIP",phyloA}});
-    layout->addWidget(ribbon);
+    ribbon->hide(); // the 0.2 activity rail replaces the top command ribbon
     // Scientific import warnings remain accessible without covering the canvas.
     notice_=new QLabel(statusBar());
     notice_->setObjectName("warningStatusIndicator");
@@ -1077,7 +1207,7 @@ Editor::Editor(bool preview):preview_(preview) {
     offline->setObjectName("offlineStatus");
     offline->setToolTip("Local-first HelixEdit beta; sequence data is not uploaded");
     statusBar()->addPermanentWidget(offline);
-    auto split=new QSplitter(Qt::Horizontal,root);layout->addWidget(split,1);
+    auto split=new QSplitter(Qt::Horizontal,root);workspaceRow->addWidget(split,1);
     tabs_=new QTabWidget;tabs_->setObjectName("studioTabs");tabs_->setDocumentMode(true);
     tabs_->setMovable(false);split->addWidget(tabs_);
     auto alignment=new QWidget;auto al=new QVBoxLayout(alignment);
