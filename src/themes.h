@@ -167,6 +167,7 @@ inline QString themeStyle(const QString &name) {
     )");
 }
 inline void applyTheme(const QString &name) {
+    qApp->setProperty("helix-theme",name);
     qApp->setStyleSheet(themeStyle(name));
     QSettings settings("HelixEdit","HelixEdit");
     settings.setValue("appearance/theme",name);
