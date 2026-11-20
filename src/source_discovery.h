@@ -36,7 +36,7 @@ inline QString discoverSourceFolder() {
         candidates<<dir.absolutePath()<<dir.filePath("HelixEdit");
         if(!dir.exists())continue;
         const auto dirs=dir.entryInfoList(QDir::Dirs|QDir::NoDotAndDotDot|QDir::Readable,
-                                          QDir::Time|QDir::Reversed);
+                                          QDir::Time);
         int scanned=0;
         for(const auto &entry:dirs) {
             if(++scanned>100)break;
