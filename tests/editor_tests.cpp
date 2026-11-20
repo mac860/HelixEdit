@@ -113,6 +113,72 @@ private slots:
         if(before.isValid())settings.setValue("updater/source",before);
         else settings.remove("updater/source");
     }
+    void v020ActivityRailAndContextViews() {
+        Editor editor(true);
+        auto *rail=editor.findChild<QFrame*>("activityRail");
+        auto *tools=editor.findChild<QFrame*>("workspaceToolPanel");
+        auto *toolStack=editor.findChild<QStackedWidget*>("workspaceToolStack");
+        auto *studio=editor.findChild<QTabWidget*>("studioTabs");
+        auto *ribbon=editor.findChild<QTabWidget*>("commandRibbon");
+        auto *sequence=editor.findChild<QToolButton*>("activitySequence");
+        auto *plasmid=editor.findChild<QToolButton*>("activityPlasmid");
+        auto *analysis=editor.findChild<QToolButton*>("activityAnalysis");
+        auto *project=editor.findChild<QToolButton*>("toggleProjectExplorer");
+        auto *collapse=editor.findChild<QToolButton*>("toggleWorkspaceTools");
+        QVERIFY(rail);QVERIFY(tools);QVERIFY(toolStack);QVERIFY(studio);
+        QVERIFY(ribbon);QVERIFY(sequence);QVERIFY(plasmid);QVERIFY(analysis);
+        QVERIFY(project);QVERIFY(collapse);
+        QCOMPARE(toolStack->count(),3);
+        QCOMPARE(studio->count(),7);
+        QVERIFY(studio->tabBar()->isHidden());
+        QVERIFY(ribbon->isHidden());
+        QCOMPARE(studio->currentIndex(),0);
+        QVERIFY(plasmid->isChecked());
+        QCOMPARE(toolStack->currentIndex(),1);
+        sequence->click();
+        QCOMPARE(studio->currentIndex(),1);
+        QCOMPARE(toolStack->currentIndex(),0);
+        QVERIFY(sequence->isChecked());
+        auto *sequenceView=editor.findChild<QToolButton*>("viewSequence");
+        QVERIFY(sequenceView);
+        auto *enzymeView=editor.findChild<QToolButton*>("viewEnzymes");
+        auto *featureView=editor.findChild<QToolButton*>("viewFeatures");
+        auto *primerView=editor.findChild<QToolButton*>("viewPrimers");
+        QVERIFY(enzymeView);QVERIFY(featureView);QVERIFY(primerView);
+        plasmid->click();
+        QCOMPARE(studio->currentIndex(),0);
+        enzymeView->click();
+        QCOMPARE(studio->currentIndex(),2);
+        QVERIFY(plasmid->isChecked());
+        featureView->click();
+        QCOMPARE(studio->currentIndex(),3);
+        primerView->click();
+        QCOMPARE(studio->currentIndex(),4);
+        analysis->click();
+        QCOMPARE(studio->currentIndex(),6);
+        QCOMPARE(toolStack->currentIndex(),2);
+        auto *historyView=editor.findChild<QToolButton*>("viewHistory");
+        QVERIFY(historyView);
+        historyView->click();
+        QCOMPARE(studio->currentIndex(),5);
+        const auto commands=editor.findChildren<QToolButton*>("contextActionAnalysis");
+        QVERIFY2(commands.size()>=6,"Analysis tools must remain accessible on the left");
+        collapse->setChecked(false);
+        QVERIFY(!tools->isVisibleTo(&editor));
+        collapse->setChecked(true);
+        QVERIFY(!tools->isHidden());
+        project->setChecked(true);
+        QVERIFY(project->isChecked());
+        const QString light=themeStyle("Light");
+        const QString dark=themeStyle("Dark");
+        const QString dracula=themeStyle("Dracula");
+        for(const QString &stylesheet:{light,dark,dracula}) {
+            QVERIFY(stylesheet.contains("QFrame#activityRail"));
+            QVERIFY(stylesheet.contains("workspaceToolPanel"));
+            QVERIFY(stylesheet.contains("activitySequence:checked"));
+            QVERIFY(stylesheet.contains("activityAnalysis:checked"));
+        }
+    }
     void compactToolbarAndUnobtrusiveNotices() {
         Editor editor(true);
         auto *quick=editor.findChild<QToolBar*>("quickActions");
