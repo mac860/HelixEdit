@@ -116,6 +116,40 @@ Editor::Editor(bool preview):preview_(preview) {
         connect(action,&QAction::triggered,this,[theme]{applyTheme(theme);});
     }
     auto fileMenu=menuBar()->addMenu("&File");
+    fileMenu->addAction("New project / workspace…",QKeySequence::New,this,[this]{
+        if(busy())return;
+        const QString dir=QFileDialog::getExistingDirectory(this,"Choose project workspace directory");
+        if(dir.isEmpty())return;
+        bool ok=false;
+        QString name=QInputDialog::getText(this,"New HelixEdit project","Project name",QLineEdit::Normal,"Untitled project",&ok).trimmed();
+        if(!ok||name.isEmpty())return;
+        name.replace(QRegularExpression("[^A-Za-z0-9 _.-]"),"_");
+        if(name=="."||name=="..")return;
+        const QString projectDir=QDir(dir).filePath(name);
+        const QString projectPath=QDir(projectDir).filePath(name+".helix");
+        if(QFileInfo::exists(projectPath)||QFileInfo::exists(projectDir)){
+            QMessageBox::warning(this,"Project exists","Choose a new project name to avoid overwriting existing files.");
+            return;
+        }
+        // Save the current document before replacing it; cancellation preserves it.
+        if(!history->isClean() && !save())return;
+        if(!QDir().mkpath(projectDir)){
+            QMessageBox::warning(this,"Workspace error","Could not create the project directory.");
+            return;
+        }
+        Document blank;blank.alphabet="DNA";
+        Record initial;initial.name="Sequence 1";initial.sequence="";
+        blank.records.append(initial);
+        try {
+            writeProject(projectPath,blank);
+            setDocument(blank);
+            path_=projectPath;
+            setWindowTitle("HelixEdit — "+name+"[*]");
+            statusBar()->showMessage("New project saved automatically: "+projectPath);
+        } catch(const std::exception &e) {
+            QMessageBox::warning(this,"Project creation failed",QString::fromUtf8(e.what()));
+        }
+    });
     auto actOpen=fileMenu->addAction("Open…",QKeySequence::Open,this,&Editor::open);
     auto actSave=fileMenu->addAction("Save project",QKeySequence::Save,this,[this]{save();});
     fileMenu->addAction("Save project as…",QKeySequence::SaveAs,this,[this]{save(true);});
@@ -222,7 +256,13 @@ Editor::Editor(bool preview):preview_(preview) {
     recoveryPath_=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+"/recovery.helix";
     QDir().mkpath(QFileInfo(recoveryPath_).absolutePath());
     setDocument(demo());
-    autosave_=new QTimer(this);autosave_->setInterval(30000);connect(autosave_,&QTimer::timeout,this,[this]{if(!preview_&&!history->isClean())try{writeProject(recoveryPath_,model->document);}catch(const std::exception &e){statusBar()->showMessage("Autosave failed: "+QString::fromUtf8(e.what()));}});autosave_->start();
+    autosave_=new QTimer(this);autosave_->setInterval(30000);connect(autosave_,&QTimer::timeout,this,[this]{if(!preview_&&!history->isClean())try{
+        // Save named projects directly; keep an independent recovery copy.
+        // Imported FASTA/GenBank files have no project path and are never overwritten.
+        if(!path_.isEmpty())writeProject(path_,model->document);
+        writeProject(recoveryPath_,model->document);
+        statusBar()->showMessage("Project autosaved.");
+    }catch(const std::exception &e){statusBar()->showMessage("Autosave failed: "+QString::fromUtf8(e.what()));}});autosave_->start();
     if(!preview_ && QFile::exists(recoveryPath_)) {
         if(QMessageBox::question(this,"Recover previous session?","A recovery project from an interrupted session is available. Open it?")==QMessageBox::Yes)runSafely([this]{setDocument(readDocument(recoveryPath_));history->resetClean();notice_->setText("Recovered session. Save a new project to keep it.");});
         else QFile::remove(recoveryPath_);
