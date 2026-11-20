@@ -1712,9 +1712,13 @@ Editor::Editor(bool preview):preview_(preview) {
     connect(explorerAction,&QAction::toggled,toggleProject,&QToolButton::setChecked);
     auto selectWorkspace=[=](int index) {
         const int mode=(index==1?0:(index==0||index==2||index==3||index==4?1:2));
+        const bool changingMode=contextStack->currentIndex()!=mode;
         QToolButton *choices[]={activitySequence,activityPlasmid,activityAnalysis};
         for(int j=0;j<3;++j)choices[j]->setChecked(mode==j);
         contextStack->setCurrentIndex(mode);
+        // Preserve a manual project-explorer toggle within one workspace,
+        // but default to canvas-first on Plasmid/Analysis and show it for Sequence.
+        if(changingMode)toggleProject->setChecked(mode==0);
         const QString roles[]={"sequence","plasmid","analysis"};
         const QString titles[]={"SEQUENCE","PLASMID","ANALYSIS"};
         const QString sub[]={"Edit & navigate","Vectors & annotations","Bioinformatics workflows"};
@@ -1736,6 +1740,7 @@ Editor::Editor(bool preview):preview_(preview) {
     // Show the project explorer by default for sequence editing. Hide it on
     // plasmid/analysis workspaces to prioritize map and result canvas width.
     toggleProject->setChecked(tabs_->currentIndex()==1);
+    side->setVisible(toggleProject->isChecked());
     connect(navFilter,&QLineEdit::textChanged,this,[this](const QString &filter){
         for(int i=0;i<navigator_->count();++i)
             navigator_->item(i)->setHidden(!navigator_->item(i)->text().contains(filter,Qt::CaseInsensitive));
