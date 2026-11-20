@@ -25,7 +25,7 @@ private slots:
   QCOMPARE(hits[0].end,17);
  }
  void csv() {
-  auto primers=readPrimerCsv("name,sequence,notes\\np1,ACGTACGT,control\\nbad,ZZZZZZZZ,skip\\n");
+  auto primers=readPrimerCsv("name,sequence,notes\np1,ACGTACGT,control\nbad,ZZZZZZZZ,skip\n");
   QCOMPARE(primers.size(),1);
   QCOMPARE(primers[0].name,QString("p1"));
  }
