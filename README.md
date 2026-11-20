@@ -4,11 +4,26 @@
 
 Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
 
-**Status: 0.1.5 beta development on `main` (new build and CI verification pending).** Existing Ubuntu source builds have been user-tested, but the 0.1.5 wrapped-sequence renderer still requires compilation and desktop validation on Ubuntu x86_64/ARM64 and macOS ARM64.
+**Status: 0.1.6 beta development on `main` (compilation/CI verification pending).** The map now renders annotations and recognition sites against the active sequence, but this 0.1.6 change must still be compiled, tested and compared against verified source records before any research-grade claim.
 
 ![HelixEdit sequence map](docs/map.png)
 
 ![HelixEdit alignment editor](docs/alignment.png)
+
+## New in 0.1.6: sequence-correct circular plasmid maps
+
+**Scientific reference:** [Addgene pLKO.1 – TRC cloning vector #10878](https://www.addgene.org/10878/sequences/) and [its sequence analyzer](https://www.addgene.org/browse/sequence/438456/). Addgene's plasmid maps may incorporate annotated GenBank features; HelixEdit must not invent those labels simply because a DNA string contains plausible-looking motifs.
+
+- **Live sequence-based recognition sites:** the circular and linear views recalculate exact sites from the active record after every sequence change. The recognized catalog now contains **26 curated palindromic motifs** (from NEB's recognition list), versus eight previously. The interface shows **recognition starts, not cleavage positions**, and makes no methylation or experimental digest claims.
+- **Confirm topology:** FASTA does not encode circular/linear topology. In the Map tab, set **Circular DNA** only when the source record confirms it. The state is retained in native \`.helix\` projects; annotated GenBank imports can carry topology directly.
+- **Source-validated annotations:** File → **Attach matching GenBank annotations to active sequence…** or Features → **Import matching GenBank annotations…** transfers only supported simple-interval features when the **entire ungapped sequence is identical in the same origin and strand orientation**. No sequence match → no labels imported. If a donor differs because of rotation, reverse complementation, variation or partial sequence coverage, transfer is intentionally rejected. This is safer than guessing coordinates.
+- **Actual annotated ring:** colored strand-aware arrows for imported/manual feature intervals, callout names with real coordinates, sequence-derived restriction-site leaders, and collision-limited labels. Unannotated records are explicitly identified as such.
+- **Review sites:** Map → **Unique sites** shows enzymes with exactly one recognized occurrence, while the **Enzymes** tab lists all sites. Settings → Map & editing exposes this preference.
+- **Dynamic information:** Map title shows the active record's real length, topology, annotation count and current recognition-site count. If a sequence base changes, motif sites disappear or appear on the next redraw, rather than remaining fixed from earlier data.
+
+To try the supplied Addgene \`>Addgene_NGS_Result\` sequence, import it into a DNA project as FASTA, open **Map**, check the app's reported nucleotide count against the **specific** verified Addgene record, and explicitly enable **Circular DNA** if confirmed. To display promoters, origins, marker genes and primer annotations, download the **annotated GenBank** for the same exact sequence (if accessible with your Addgene account) and attach it to that record. Alternatively open the annotated GenBank directly. A raw FASTA sequence alone does **not** validate the gene identities or their coordinates. Note that this limited importer does not yet preserve complex \`join()\` feature locations or arbitrary GenBank metadata.
+
+See [scientific map validation and limits](docs/GUI_016.md). **This is not a claim that the full user-pasted Addgene sequence has been verified base-for-base against Addgene.**
 
 ## New in 0.1.5: Wrap to Window in Sequence
 
@@ -37,7 +52,7 @@ See [the 0.1.4 GUI change notes](docs/GUI_014.md).
 
 The interface uses a compact top toolbar, left searchable sequence navigator, and map-first tabs: **Map, Sequence, Enzymes, Features, Primers, History and Tools**. Circular and linear maps draw readable colored annotations and exact enzyme recognition positions. Map layers and zoom are adjustable; undo, primer library and reproducibility logs are functional. Appearance settings include **Light, Dark and Dracula**.
 
-The built-in enzyme catalog remains an eight-motif scientific preview, not a full digest simulator. Primer3 and other scientific engines require their own optional installations. See [GUI design, functionality and validation notes](docs/GUI_012.md).
+The built-in enzyme catalog remains a 26-motif scientific preview, not a full digest simulator. Primer3 and other scientific engines require their own optional installations. See [GUI design, functionality and validation notes](docs/GUI_012.md).
 
 ## Settings & preferences (0.1.3 beta)
 
@@ -141,12 +156,12 @@ git pull --ff-only origin main
 bash scripts/build_ubuntu_deb.sh
 ```
 
-The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.5-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
+The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.6-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
 
 Install the generated package (use the exact path printed by the script):
 
 ```bash
-sudo apt install --reinstall ./build-ubuntu-amd64/HelixEdit-0.1.5-x86_64.deb
+sudo apt install --reinstall ./build-ubuntu-amd64/HelixEdit-0.1.6-x86_64.deb
 helixedit
 ```
 
