@@ -60,4 +60,10 @@ for package in "${packages[@]}"; do
   }
 done
 echo "Inspect with: dpkg-deb --info '$BUILD_DIR'/HelixEdit-*.deb"
-echo "Install with: sudo apt install '$BUILD_DIR'/HelixEdit-*.deb"
+VERSION="$(sed -n 's/^project(HelixEdit VERSION \([0-9.]*\) .*/\1/p' "$ROOT/CMakeLists.txt" | head -1)"
+EXPECTED_PACKAGE="$BUILD_DIR/HelixEdit-$VERSION-$(uname -m).deb"
+if [[ -f "$EXPECTED_PACKAGE" ]]; then
+  echo "Install with: sudo apt install '$EXPECTED_PACKAGE'"
+else
+  echo "Install with: sudo apt install <exact-package-path-from-the-list-above>"
+fi
