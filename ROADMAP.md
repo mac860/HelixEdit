@@ -76,6 +76,25 @@ HelixEdit is one native offline-first application with three complementary works
 - **Suggested implementation order:** 0.1.x stabilize project management/themes → 0.2 Sequence Studio editing, ORFs, translation and primer mapping → 0.3 Plasmid Studio GenBank/restriction/maps → 0.4 Analysis Studio BLAST/statistics/distances → 0.5 cloning and performance → later phylogenetics and stable 1.0.
 - **Definition of done:** working implementation, automated scientific tests, GUI accessibility checks, documentation, sample project, native CI packaging and an explicit limitations note. Planned functionality is not labeled shipped.
 
+## Addgene integration — initial implementation and next steps
+
+**Implemented in source on main (build validation pending):**
+- File → Addgene plasmids → Find plasmid by Addgene ID opens the official Addgene plasmid page in the system browser.
+- Search Addgene catalog opens the official search page.
+- Import Addgene GenBank into project reads a **user-downloaded** GenBank file, appends records to the current nucleotide project without replacing existing records, resolves duplicate names and adds source-verification warnings.
+- Sequence map → Restriction sites reports recognition positions for an initial eight-enzyme exact motif set, including circular-origin matches. This is **not** a validated digest simulator and does not yet calculate cleavage positions.
+- Dedicated restriction recognition tests have been added.
+
+**Next:**
+1. Verify CMake/CTest on all supported architectures and correct any compile or UI defects.
+2. Improve GenBank parsing for compound features, qualifiers and round-trip export before claiming annotation fidelity.
+3. Add feature selection, primer tracks, cleavage offsets and configurable restriction database.
+4. Evaluate authenticated Addgene API access only through an approved developer token and its license terms; never scrape gated sequences, store credentials in project files or hardcode a token.
+5. Record Addgene ID, sequence completeness, download provenance and user acknowledgment of source limitations.
+6. Build interactive circular-map highlighting and safe cloning simulations with test fixtures.
+
+**Access constraints:** Addgene requires sign-in for sequence downloads; its developer API and bulk datasets require approved access. The current integration deliberately delegates sign-in/download to the browser. No direct authenticated Addgene API connection is claimed.
+
 ## P0 — Beta release gates
 1. Build, CTest, GUI smoke tests and packages on Ubuntu 24.04+ x86_64 and ARM64 and macOS ARM64.
 2. Validate actual Mac M1 interaction, file dialogs, keyboard, graphics and app bundle.
