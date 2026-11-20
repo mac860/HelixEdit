@@ -323,7 +323,7 @@ Editor::Editor(bool preview):preview_(preview) {
         const auto &d=model->document;
         QString report="SEQUENCE STATISTICS\n";
         report+="Molecule type: "+d.alphabet+"\nRecord count: "+QString::number(d.records.size())+
-                "\nAlignment width: "+QString::number(width(d))+"\n\n";
+                "\nAlignment width: "+QString::number(helix::width(d))+"\n\n";
         for(const auto &r:d.records){
             const auto x=sequenceStatistics(r,d.alphabet);
             report+=QString("%1\n  ungapped=%2  columns=%3  gaps=%4  ambiguous=%5  GC=%6\n")
@@ -684,7 +684,7 @@ Editor::Editor(bool preview):preview_(preview) {
         auto saveButton=new QPushButton("Save library");
         actions->addWidget(mapButton);actions->addWidget(saveButton);layout->addLayout(actions);
         auto output=new QPlainTextEdit;output->setReadOnly(true);layout->addWidget(output);
-        connect(saveButton,&QPushButton::clicked,&dlg,[=]{
+        connect(saveButton,&QPushButton::clicked,&dlg,[=,&dlg]{
             if(!QDir().mkpath(base)){QMessageBox::warning(&dlg,"Primer library","Cannot create data folder.");return;}
             QSaveFile file(libraryPath);
             QByteArray bytes=editor->toPlainText().toUtf8();
