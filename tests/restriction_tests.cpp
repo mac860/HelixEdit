@@ -13,15 +13,15 @@ private slots:
   QCOMPARE(sites[0].end,9);
  }
  void circularWrap() {
-  Record r;r.name="p";r.sequence="TTCGGGGAA";r.circular=true;
+  Record r;r.name="p";r.sequence="AATTCGGGG";r.circular=true;
   auto sites=findRestrictionSites(r);
   QCOMPARE(sites.size(),1);
   QCOMPARE(sites[0].enzyme,QString("EcoRI"));
-  QCOMPARE(sites[0].start,7);
-  QCOMPARE(sites[0].end,13);
+  QCOMPARE(sites[0].start,8);
+  QCOMPARE(sites[0].end,14);
  }
  void noWrapLinear() {
-  Record r;r.name="p";r.sequence="TTCGGGGAA";r.circular=false;
+  Record r;r.name="p";r.sequence="AATTCGGGG";r.circular=false;
   QVERIFY(findRestrictionSites(r).isEmpty());
  }
 };
