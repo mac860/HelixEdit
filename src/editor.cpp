@@ -801,9 +801,15 @@ Editor::Editor(bool preview):preview_(preview) {
     auto mapStrip=new QWidget(mapPage);mapStrip->setObjectName("mapToolStrip");
     auto mapStripLayout=new QHBoxLayout(mapStrip);
     mapStripLayout->setContentsMargins(5,1,5,1);mapStripLayout->setSpacing(8);
-    auto enzymeLabels=new QCheckBox("Enzyme labels");enzymeLabels->setChecked(true);
+    auto enzymeLabels=new QCheckBox("Enzyme labels");
+    enzymeLabels->setObjectName("mapEnzymeToggle");
+    enzymeLabels->setChecked(QSettings("HelixEdit","HelixEdit").value("map/showEnzymes",true).toBool());
+    mapEnzymeToggle_=enzymeLabels;
     enzymeLabels->setToolTip("Show exact recognition sites from the built-in eight-enzyme set");
-    auto featureLabels=new QCheckBox("Features");featureLabels->setChecked(true);
+    auto featureLabels=new QCheckBox("Features");
+    featureLabels->setObjectName("mapFeatureToggle");
+    featureLabels->setChecked(QSettings("HelixEdit","HelixEdit").value("map/showFeatures",true).toBool());
+    mapFeatureToggle_=featureLabels;
     mapStripLayout->addWidget(enzymeLabels);mapStripLayout->addWidget(featureLabels);
     mapStripLayout->addStretch();
     auto zoomOut=new QToolButton(mapStrip);zoomOut->setObjectName("mapZoomOut");zoomOut->setText("−");
@@ -815,9 +821,19 @@ Editor::Editor(bool preview):preview_(preview) {
     mapStripLayout->addWidget(new QLabel("Map zoom"));mapStripLayout->addWidget(zoomOut);
     mapStripLayout->addWidget(zoomReset);mapStripLayout->addWidget(zoomIn);
     ml->addWidget(mapStrip);
-    map_=new MapView;map_->setObjectName("plasmidMap");ml->addWidget(map_,1);
-    connect(enzymeLabels,&QCheckBox::toggled,map_,[this](bool on){map_->showEnzymes=on;map_->update();});
-    connect(featureLabels,&QCheckBox::toggled,map_,[this](bool on){map_->showFeatures=on;map_->update();});
+    map_=new MapView;map_->setObjectName("plasmidMap");
+    map_->showEnzymes=enzymeLabels->isChecked();
+    map_->showFeatures=featureLabels->isChecked();
+    map_->setZoom(QSettings("HelixEdit","HelixEdit").value("map/defaultZoom",100).toInt()/100.0);
+    ml->addWidget(map_,1);
+    connect(enzymeLabels,&QCheckBox::toggled,map_,[this](bool on){
+        QSettings("HelixEdit","HelixEdit").setValue("map/showEnzymes",on);
+        map_->showEnzymes=on;map_->update();
+    });
+    connect(featureLabels,&QCheckBox::toggled,map_,[this](bool on){
+        QSettings("HelixEdit","HelixEdit").setValue("map/showFeatures",on);
+        map_->showFeatures=on;map_->update();
+    });
     connect(zoomIn,&QToolButton::clicked,map_,[this]{map_->setZoom(map_->zoom+.1);});
     connect(zoomOut,&QToolButton::clicked,map_,[this]{map_->setZoom(map_->zoom-.1);});
     connect(zoomReset,&QToolButton::clicked,map_,[this]{map_->setZoom(1.0);});
@@ -827,7 +843,8 @@ Editor::Editor(bool preview):preview_(preview) {
         if(model->document.alphabet=="Protein"){
             QMessageBox::information(this,"Primer3","Primer3 requires a nucleotide template.");return;
         }
-        const QString executable=QStandardPaths::findExecutable("primer3_core");
+        QString executable=QSettings("HelixEdit","HelixEdit").value("tools/primer3_core").toString();
+        if(executable.isEmpty())executable=QStandardPaths::findExecutable("primer3_core");
         if(executable.isEmpty()){
             QMessageBox::information(this,"Primer3 not installed",
                 "Install the current Primer3 command-line package (primer3_core) and add it to PATH. "
@@ -1075,7 +1092,9 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     connect(tabs_,&QTabWidget::currentChanged,this,[this,historyPage,reloadHistory](int){
         if(tabs_->currentWidget()==historyPage)reloadHistory->click();
     });
-    tabs_->setCurrentWidget(mapPage);
+    if(QSettings("HelixEdit","HelixEdit").value("workspace/startTab","Map").toString()=="Sequence")
+        tabs_->setCurrentWidget(alignment);
+    else tabs_->setCurrentWidget(mapPage);
 
     auto side=new QWidget;side->setObjectName("projectSidebar");
     side->setMinimumWidth(205);side->setMaximumWidth(295);
@@ -1130,7 +1149,9 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     recoveryPath_=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)+"/recovery.helix";
     QDir().mkpath(QFileInfo(recoveryPath_).absolutePath());
     setDocument(demo());
-    autosave_=new QTimer(this);autosave_->setInterval(30000);connect(autosave_,&QTimer::timeout,this,[this]{if(!preview_&&!history->isClean())try{
+    autosave_=new QTimer(this);
+    autosave_->setInterval(qBound(30,QSettings("HelixEdit","HelixEdit")
+        .value("editing/autosaveSeconds",30).toInt(),300)*1000);connect(autosave_,&QTimer::timeout,this,[this]{if(!preview_&&!history->isClean())try{
         // Save named projects directly; keep an independent recovery copy.
         // Imported FASTA/GenBank files have no project path and are never overwritten.
         if(!path_.isEmpty())writeProject(path_,model->document);
