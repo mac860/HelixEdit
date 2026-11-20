@@ -1531,8 +1531,8 @@ void Editor::showSettings() {
     auto sourceRow=new QHBoxLayout;
     auto source=new QLineEdit;
     source->setObjectName("updateSourcePreference");
-    source->setPlaceholderText("Existing cloned HelixEdit source folder");
-    source->setText(stored.value("updater/source").toString());
+    source->setPlaceholderText("Automatically locate this HelixEdit Git checkout");
+    source->setText(discoverSourceFolder());
     auto browseSource=new QPushButton("Browse…");
     sourceRow->addWidget(source,1);
     sourceRow->addWidget(browseSource);
