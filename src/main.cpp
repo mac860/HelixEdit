@@ -1,6 +1,6 @@
 #include "editor.h"
 int main(int argc,char **argv){
-    QApplication app(argc,argv);QCoreApplication::setOrganizationName("HelixEdit");QCoreApplication::setApplicationName("HelixEdit");QCoreApplication::setApplicationVersion("0.1.2");
+    QApplication app(argc,argv);QCoreApplication::setOrganizationName("HelixEdit");QCoreApplication::setApplicationName("HelixEdit");QCoreApplication::setApplicationVersion("0.1.3");
     QApplication::setWindowIcon(QIcon(":/packaging/helixedit.svg"));
     QCommandLineParser parser;parser.setApplicationDescription("Compact, offline sequence studio");parser.addHelpOption();parser.addVersionOption();
     parser.addPositionalArgument("file","FASTA, CLUSTAL, GenBank or .helix project");
