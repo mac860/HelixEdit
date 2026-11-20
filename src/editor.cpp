@@ -1619,10 +1619,17 @@ void Editor::updateSelection() {
     map_->alphabet=doc.alphabet;
     map_->update();
     mapTitle_->setTextFormat(Qt::PlainText);
-    mapTitle_->setText(QString("%1   ·   %2 %3   ·   %4")
-        .arg(r.name).arg(QLocale().toString(ungapped(r.sequence).size()))
+    const int recognitionCount=doc.alphabet=="Protein"?0:findRestrictionSites(r).size();
+    const QString moleculeName=r.name.size()>36?r.name.left(35)+"…":r.name;
+    mapTitle_->setText(QString("%1  ·  %2 %3  ·  %4  ·  %5 annotated features  ·  %6 recognition sites")
+        .arg(moleculeName)
+        .arg(QLocale().toString(ungapped(r.sequence).size()))
         .arg(doc.alphabet=="Protein"?"aa":"bp")
-        .arg(r.circular?"Circular":"Linear"));
+        .arg(r.circular?"Circular":"Linear")
+        .arg(r.features.size()).arg(recognitionCount));
+    mapTitle_->setToolTip(r.name+"\n"+QString::number(ungapped(r.sequence).size())+
+        " residues. Recognition positions are calculated from the current loaded sequence. "+
+        "Feature labels come only from imported or manually entered annotations.");
     features_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     features_->clear();
     if(annotationTable_)annotationTable_->clear();
