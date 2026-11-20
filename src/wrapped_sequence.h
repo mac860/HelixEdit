@@ -22,11 +22,13 @@ public:
     void setSelectedColumn(int column);
     void scrollToAlignmentColumn(int column);
     std::function<void(int)> onColumnActivated;
+    std::function<void(int)> onEditColumn;
 
 protected:
     void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
 
 private:
     Record record_;
