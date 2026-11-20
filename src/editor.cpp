@@ -313,6 +313,7 @@ Editor::Editor(bool preview):preview_(preview) {
     setWindowTitle("HelixEdit");resize(1260,780);setMinimumSize(900,600);
     model=new AlignmentModel(this);history=new QUndoStack(this);history->setUndoLimit(30);
     applyTheme(savedTheme());
+    auto fileMenu=menuBar()->addMenu("&File");
     auto viewMenu=menuBar()->addMenu("&View");
     auto wrapMenuAction=viewMenu->addAction("Wrap to Window");
     wrapMenuAction->setObjectName("menuWrapToWindow");
@@ -321,7 +322,6 @@ Editor::Editor(bool preview):preview_(preview) {
         .value("sequence/wrapToWindow",true).toBool());
     wrapMenuAction->setShortcut(QKeySequence("Ctrl+Shift+W"));
     wrapMenuAction->setToolTip("Show active sequence with dynamically wrapped DNA/RNA or protein blocks");
-    auto fileMenu=menuBar()->addMenu("&File");
     fileMenu->addAction("New project / workspace…",QKeySequence::New,this,[this]{
         if(busy())return;
         const QString dir=QFileDialog::getExistingDirectory(this,"Choose project workspace directory");
