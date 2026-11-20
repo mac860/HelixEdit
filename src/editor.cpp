@@ -248,6 +248,87 @@ Editor::Editor(bool preview):preview_(preview) {
     auto spacer=new QWidget;spacer->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);bar->addWidget(spacer);
     auto offline=new QLabel("<b style='color:#159884'>● OFFLINE</b>   <span style='color:#9d90ae'>PREVIEW 0.1</span>  ");bar->addWidget(offline);
     auto root=new QWidget;setCentralWidget(root);auto layout=new QVBoxLayout(root);layout->setContentsMargins(18,13,18,8);layout->setSpacing(9);
+    // Compact, category-based ribbon: each button triggers the existing menu action,
+    // keeping keyboard shortcuts, enablement and behavior in one place.
+    auto ribbon=new QTabWidget(root);
+    ribbon->setObjectName("commandRibbon");
+    ribbon->setDocumentMode(true);
+    ribbon->setMaximumHeight(112);
+    ribbon->setMinimumHeight(92);
+    auto addRibbonCategory=[&](const QString &name,
+                               const QVector<QPair<QString,QAction*>> &commands){
+        auto page=new QWidget(ribbon);
+        auto row=new QHBoxLayout(page);
+        row->setContentsMargins(8,4,8,4);
+        row->setSpacing(6);
+        for(const auto &command:commands){
+            if(!command.second)continue;
+            auto button=new QToolButton(page);
+            button->setText(command.first);
+            button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+            button->setIconSize(QSize(22,22));
+            button->setMinimumWidth(78);
+            button->setMaximumWidth(132);
+            button->setAutoRaise(true);
+            button->setDefaultAction(command.second);
+            button->setText(command.first);
+            button->setToolTip(command.second->text()+"\\n"+command.second->toolTip());
+            row->addWidget(button);
+        }
+        row->addStretch(1);
+        ribbon->addTab(page,name);
+    };
+    auto findMenuAction=[](QMenu *menu,const QString &label)->QAction*{
+        for(auto *action:menu->actions())if(action->text()==label)return action;
+        return nullptr;
+    };
+    auto setRibbonIcon=[this](QAction *action,QStyle::StandardPixmap icon){
+        if(action && action->icon().isNull())action->setIcon(style()->standardIcon(icon));
+    };
+    auto fileNew=fileMenu->addAction("New workspace…",QKeySequence::New,this,[this]{
+        if(!canReplace())return;
+        Document d=demo();
+        d.records.resize(1);
+        d.records[0].name="New sequence";
+        d.records[0].features.clear();
+        d.records[0].circular=false;
+        setDocument(d);
+        statusBar()->showMessage("New unsaved workspace. Use Save project to choose a file.");
+    });
+    // Keep the existing menu actions as the single command source.
+    auto actionFor=[&](QMenu *menu,const QString &name,QStyle::StandardPixmap icon){
+        QAction *a=findMenuAction(menu,name);
+        setRibbonIcon(a,icon);
+        if(a)a->setToolTip(name);
+        return a;
+    };
+    auto openA=actionFor(fileMenu,"Open…",QStyle::SP_DialogOpenButton);
+    auto saveA=actionFor(fileMenu,"Save project",QStyle::SP_DialogSaveButton);
+    auto exportA=actionFor(fileMenu,"Export FASTA / CLUSTAL…",QStyle::SP_DialogSaveButton);
+    auto newA=actionFor(fileMenu,"New workspace…",QStyle::SP_FileIcon);
+    auto addA=actionFor(edit,"Add sequence…",QStyle::SP_FileIcon);
+    auto reverseA=actionFor(edit,"Reverse complement selected rows",QStyle::SP_BrowserReload);
+    auto gapA=actionFor(edit,"Insert gap at selected column",QStyle::SP_ArrowRight);
+    auto translateA=actionFor(analysis,"Translate active sequence…",QStyle::SP_MediaPlay);
+    auto orfA=actionFor(analysis,"Find open reading frames…",QStyle::SP_FileDialogDetailedView);
+    auto consensusA=actionFor(analysis,"Consensus",QStyle::SP_DialogApplyButton);
+    auto restrictA=actionFor(analysis,"Common restriction sites",QStyle::SP_FileDialogContentsView);
+    auto mafftA=actionFor(tools,"Align with MAFFT",QStyle::SP_BrowserReload);
+    auto muscleA=actionFor(tools,"Align with MUSCLE 5",QStyle::SP_BrowserReload);
+    auto configA=actionFor(tools,"Configure executables…",QStyle::SP_FileDialogDetailedView);
+    auto addgeneA=actionFor(addgeneMenu,"Find plasmid by Addgene ID…",QStyle::SP_DirLinkIcon);
+    auto importA=actionFor(addgeneMenu,"Import Addgene GenBank into project…",QStyle::SP_DialogOpenButton);
+    setRibbonIcon(undo,QStyle::SP_ArrowBack);
+    setRibbonIcon(redo,QStyle::SP_ArrowForward);
+    addRibbonCategory("Home",{{"New",newA},{"Open",openA},{"Save",saveA},
+                              {"Undo",undo},{"Redo",redo},{"Export",exportA}});
+    addRibbonCategory("Sequence",{{"Add sequence",addA},{"Insert gap",gapA},
+                                  {"Reverse",reverseA},{"Translate",translateA},{"Find ORFs",orfA}});
+    addRibbonCategory("Plasmid",{{"Addgene ID",addgeneA},{"Import GenBank",importA},
+                                 {"Restriction",restrictA}});
+    addRibbonCategory("Analysis",{{"MAFFT",mafftA},{"MUSCLE",muscleA},
+                                  {"Consensus",consensusA},{"ORFs",orfA},{"Tool settings",configA}});
+    layout->addWidget(ribbon);
     auto strip=new QHBoxLayout;auto title=new QLabel("<b style='font-size:19px'>Your sequences, in focus.</b>");strip->addWidget(title);strip->addStretch();
     molecule_=new QComboBox;molecule_->addItems({"DNA","RNA","Protein"});molecule_->setToolTip("Verify molecule type; short proteins cannot always be inferred from letters.");strip->addWidget(molecule_);
     search_=new QLineEdit;search_->setPlaceholderText("Find exact motif in active row…");search_->setMaximumWidth(245);strip->addWidget(search_);
