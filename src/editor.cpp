@@ -1779,6 +1779,10 @@ void Editor::showSettings() {
     mapFeatures->setChecked(stored.value("map/showFeatures",true).toBool());
     mapLayout->addWidget(mapEnzymes);
     mapLayout->addWidget(mapFeatures);
+    auto uniquePreference=new QCheckBox("Show only single-occurrence recognition sites on the map");
+    uniquePreference->setObjectName("uniqueCuttersPreference");
+    uniquePreference->setChecked(stored.value("map/uniqueCuttersOnly",true).toBool());
+    mapLayout->addWidget(uniquePreference);
     auto strandHeading=new QLabel("<b>Sequence strand display</b>");
     mapLayout->addWidget(strandHeading);
     auto wrapPreference=new QCheckBox("Wrap active sequence to window width");
@@ -1929,6 +1933,7 @@ void Editor::showSettings() {
         startPage->setCurrentText("Map");
         mapEnzymes->setChecked(true);
         mapFeatures->setChecked(true);
+        uniquePreference->setChecked(true);
         wrapPreference->setChecked(true);
         complementPreference->setChecked(true);
         featureTrackPreference->setChecked(true);
@@ -1966,6 +1971,7 @@ void Editor::showSettings() {
         settings.setValue("workspace/startTab",startPage->currentText());
         settings.setValue("map/showEnzymes",mapEnzymes->isChecked());
         settings.setValue("map/showFeatures",mapFeatures->isChecked());
+        settings.setValue("map/uniqueCuttersOnly",uniquePreference->isChecked());
         settings.setValue("sequence/wrapToWindow",wrapPreference->isChecked());
         settings.setValue("sequence/showComplement",complementPreference->isChecked());
         settings.setValue("sequence/showFeatures",featureTrackPreference->isChecked());
@@ -1977,6 +1983,7 @@ void Editor::showSettings() {
         applyTheme(theme->currentText());
         if(mapEnzymeToggle_)mapEnzymeToggle_->setChecked(mapEnzymes->isChecked());
         if(mapFeatureToggle_)mapFeatureToggle_->setChecked(mapFeatures->isChecked());
+        if(uniqueCuttersToggle_)uniqueCuttersToggle_->setChecked(uniquePreference->isChecked());
         if(wrapToggle_)wrapToggle_->setChecked(wrapPreference->isChecked());
         if(complementToggle_)complementToggle_->setChecked(complementPreference->isChecked());
         if(wrappedFeaturesToggle_)wrappedFeaturesToggle_->setChecked(featureTrackPreference->isChecked());
