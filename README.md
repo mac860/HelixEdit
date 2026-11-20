@@ -77,7 +77,7 @@ The script creates a fresh architecture-specific directory such as `build-ubuntu
 Install the generated package (use the exact path printed by the script):
 
 ```bash
-sudo apt install ./build-ubuntu-amd64/HelixEdit-*.deb
+sudo apt install ./build-ubuntu-amd64/HelixEdit-0.1.2-x86_64.deb
 helixedit
 ```
 
