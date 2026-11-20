@@ -164,7 +164,7 @@ private slots:
         const auto commands=editor.findChildren<QToolButton*>("contextActionAnalysis");
         QVERIFY2(commands.size()>=6,"Analysis tools must remain accessible on the left");
         collapse->setChecked(false);
-        QVERIFY(!tools->isVisibleTo(&editor));
+        QVERIFY(tools->isHidden());
         collapse->setChecked(true);
         QVERIFY(!tools->isHidden());
         project->setChecked(true);
