@@ -283,7 +283,7 @@ inline QString themeStyle(const QString &name) {
         dark?(dracula?"#2C2042":"#122945"):"#EDE3FF",
         dark?(dracula?"#153C42":"#102C33"):"#CFFAF2",
         chrome,stroke,panel,focus,softText,
-        dark?"#B3C4E5":"#4F6787",hoverFill);
+        dark?"#B3C4E5":"#4F6787").arg(hoverFill);
 }
 inline void applyTheme(const QString &name) {
     qApp->setProperty("helix-theme",name);
