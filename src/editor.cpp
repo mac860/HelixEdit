@@ -541,7 +541,10 @@ Editor::Editor(bool preview):preview_(preview) {
             }
             next.warnings+=imported.warnings;
             next.warnings.append("Imported from a user-selected GenBank file. Verify full-length sequence and annotations against the Addgene source.");
+            const int newFirstRow=model->document.records.size();
             commit(next,"Import Addgene GenBank");
+            if(model->columnCount()>0)table->setCurrentIndex(model->index(newFirstRow,0));
+            tabs_->setCurrentIndex(0); // Map now shows the imported, annotated molecule.
             statusBar()->showMessage(QString("Imported %1 plasmid record(s); save your .helix project.").arg(imported.records.size()));
         });
     });
@@ -1570,7 +1573,13 @@ void Editor::runSafely(const std::function<void()> &fn){try{fn();}catch(const st
 bool Editor::busy() const{return process_!=nullptr;}
 int Editor::activeRow() const {return table->currentIndex().isValid()?table->currentIndex().row():0;}
 void Editor::applyDocument(const Document &d) {int row=activeRow(),col=qMax(0,table->currentIndex().column());model->replace(d);if(!d.records.isEmpty())table->setCurrentIndex(model->index(qMin(row,int(d.records.size()-1)),qMin(col,helix::width(d)-1)));refresh();}
-void Editor::setDocument(const Document &d){validateDocument(d);path_.clear();history->clear();applyDocument(d);history->setClean();setWindowTitle("HelixEdit — Untitled[*]");}
+void Editor::setDocument(const Document &d){
+    validateDocument(d);path_.clear();history->clear();applyDocument(d);
+    if(model->rowCount()>0 && model->columnCount()>0)
+        table->setCurrentIndex(model->index(0,0));
+    history->setClean();
+    setWindowTitle("HelixEdit — Untitled[*]");
+}
 void Editor::commit(const Document &d,const QString &label){validateDocument(d);history->push(new Change(this,model->document,d,label));}
 void Editor::refresh() {
     const auto &d=model->document;
@@ -1722,7 +1731,7 @@ void Editor::savePath(const QString &p){writeProject(p,model->document);path_=p;
 void Editor::open(){if(!canReplace())return;auto p=QFileDialog::getOpenFileName(this,"Open sequences",{},"Sequences (*.helix *.fa *.fasta *.fna *.faa *.aln *.gb *.gbk *.genbank);;All files (*)");if(!p.isEmpty())runSafely([&]{loadPath(p);});}
 bool Editor::save(bool as){QString p=path_;if(as||p.isEmpty())p=QFileDialog::getSaveFileName(this,"Save HelixEdit project",p,"HelixEdit project (*.helix)");if(p.isEmpty())return false;if(!p.endsWith(".helix",Qt::CaseInsensitive))p+=".helix";try{savePath(p);return true;}catch(const std::exception &e){QMessageBox::warning(this,"Save failed",e.what());return false;}}
 void Editor::exportFile(){auto p=QFileDialog::getSaveFileName(this,"Export sequences (features and topology omitted)",{},"FASTA (*.fasta);;CLUSTAL (*.aln)");if(p.isEmpty())return;runSafely([&]{QString data=p.endsWith(".aln",Qt::CaseInsensitive)?clustal(model->document):fasta(model->document);QSaveFile f(p);if(!f.open(QIODevice::WriteOnly)||f.write(data.toUtf8())!=data.toUtf8().size()||!f.commit())throw std::runtime_error(f.errorString().toStdString());statusBar()->showMessage("Sequence-only export saved; project metadata is retained in .helix only.");});}
-void Editor::addSequence(){if(busy())return;QDialog dlg(this);dlg.setWindowTitle("Add a sequence");auto l=new QVBoxLayout(&dlg);auto name=new QLineEdit;name->setPlaceholderText("Sequence name");l->addWidget(name);auto seq=new QPlainTextEdit;seq->setPlaceholderText("Paste residues or a FASTA record");l->addWidget(seq);auto buttons=new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);l->addWidget(buttons);connect(buttons,&QDialogButtonBox::accepted,&dlg,&QDialog::accept);connect(buttons,&QDialogButtonBox::rejected,&dlg,&QDialog::reject);dlg.resize(480,310);if(dlg.exec()!=QDialog::Accepted)return;runSafely([&]{auto d=model->document;auto text=seq->toPlainText().trimmed();if(text.startsWith('>')){auto incoming=parseFasta(text);for(const auto &r:incoming.records)d.records.append(r);}else d.records.append(Record{name->text().trimmed(),validateSequence(text),{},false});commit(d,"Add sequence");});}
+void Editor::addSequence(){if(busy())return;QDialog dlg(this);dlg.setWindowTitle("Add a sequence");auto l=new QVBoxLayout(&dlg);auto name=new QLineEdit;name->setPlaceholderText("Sequence name");l->addWidget(name);auto seq=new QPlainTextEdit;seq->setPlaceholderText("Paste residues or a FASTA record");l->addWidget(seq);auto buttons=new QDialogButtonBox(QDialogButtonBox::Ok|QDialogButtonBox::Cancel);l->addWidget(buttons);connect(buttons,&QDialogButtonBox::accepted,&dlg,&QDialog::accept);connect(buttons,&QDialogButtonBox::rejected,&dlg,&QDialog::reject);dlg.resize(480,310);if(dlg.exec()!=QDialog::Accepted)return;runSafely([&]{auto d=model->document;auto text=seq->toPlainText().trimmed();if(text.startsWith('>')){auto incoming=parseFasta(text);for(const auto &r:incoming.records)d.records.append(r);}else d.records.append(Record{name->text().trimmed(),validateSequence(text),{},false});const int newRow=model->document.records.size();commit(d,"Add sequence");if(model->columnCount()>0)table->setCurrentIndex(model->index(newRow,0));});}
 void Editor::importMatchingGenBankAnnotations() {
     if(busy()||model->document.alphabet=="Protein")return;
     const QString path=QFileDialog::getOpenFileName(this,
