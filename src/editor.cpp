@@ -76,6 +76,10 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
     const QColor foreground(dark?"#eef3fa":"#243247");
     const QColor muted(dark?"#97a7bb":"#72839a");
     const QColor line(dark?"#607088":"#a0b1c7");
+    // Clip content to a rounded glass-like map panel.
+    QPainterPath panelClip;
+    panelClip.addRoundedRect(bounds.adjusted(1,1,-1,-1),12,12);
+    p.setClipPath(panelClip);
     p.fillRect(bounds,bg);
     const QString seq=ungapped(record.sequence);
     const int n=int(seq.size());
@@ -1250,6 +1254,11 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     else tabs_->setCurrentWidget(mapPage);
 
     auto side=new QWidget;side->setObjectName("projectSidebar");
+    auto sideShadow=new QGraphicsDropShadowEffect(side);
+    sideShadow->setBlurRadius(18);
+    sideShadow->setOffset(0,3);
+    sideShadow->setColor(QColor(39,69,122,38));
+    side->setGraphicsEffect(sideShadow);
     side->setMinimumWidth(205);side->setMaximumWidth(295);
     auto sl=new QVBoxLayout(side);sl->setContentsMargins(9,9,9,7);sl->setSpacing(7);
     auto sideTitle=new QLabel("HELIXEDIT  /  PROJECT");
