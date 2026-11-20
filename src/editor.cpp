@@ -310,7 +310,7 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
     QString footer=showEnzymes
         ?QString("%1 recognition sites from %2 curated motifs").arg(totalSiteCount).arg(restrictionMotifs().size())
         :QString("Restriction recognition labels hidden");
-    if(uniqueCuttersOnly)footer+=QString("  ·  %1 unique sites shown").arg(visibleSiteCount);
+    if(showEnzymes && uniqueCuttersOnly)footer+=QString("  ·  %1 unique sites shown").arg(visibleSiteCount);
     if(hiddenLabels)footer+=QString("  ·  %1 labels hidden (see Features / Enzymes)").arg(hiddenLabels);
     p.drawText(QRectF(bounds.left()+12,bounds.bottom()-25,bounds.width()-24,16),
         Qt::AlignCenter,footer+"  ·  recognition starts, not cut positions");
