@@ -33,6 +33,23 @@ public:
 protected:
     void paintEvent(QPaintEvent *) override;
 };
+// Compact, theme-aware residue composition visualization for the active row.
+class CompositionView : public QWidget {
+public:
+    explicit CompositionView(QWidget *parent=nullptr):QWidget(parent) {
+        setMinimumHeight(67);setMaximumHeight(72);
+        setObjectName("compositionChart");
+        setToolTip("Relative residue composition of the selected sequence (gaps excluded)");
+    }
+    void setSequence(const QString &sequence,const QString &alphabet) {
+        sequence_=sequence;alphabet_=alphabet;update();
+    }
+    int ungappedLength() const {return sequence_.size()-sequence_.count('-');}
+protected:
+    void paintEvent(QPaintEvent *) override;
+private:
+    QString sequence_,alphabet_="DNA";
+};
 class Editor : public QMainWindow {
     Q_OBJECT
 public:
@@ -56,6 +73,7 @@ private:
     QString path_,recoveryPath_;
     QTabWidget *tabs_;
     MapView *map_=nullptr;
+    CompositionView *composition_=nullptr;
     QLabel *stats_,*selection_,*notice_,*mapTitle_;
     QListWidget *features_;
     QListWidget *navigator_=nullptr;
