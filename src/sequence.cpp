@@ -116,7 +116,7 @@ Document parseGenBank(const QString &text) {
                     // or quoted (/label="AmpR promoter"). Keep original names
                     // rather than replacing them with generic feature types.
                     const auto m=QRegularExpression(
-                        R"(^/(label|gene|product)\s*=\s*(?:"([^"]+)"|(.+))$)").match(loc);
+                        R"regex(^/(label|gene|product)\s*=\s*(?:"([^"]+)"|(.+))$)regex").match(loc);
                     if(m.hasMatch()) {
                         const QString value=(m.captured(2).isEmpty()?
                             m.captured(3):m.captured(2)).trimmed();
