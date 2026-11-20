@@ -1,5 +1,6 @@
 #include "editor.h"
 #include "themes.h"
+#include "updater.h"
 #include "orf.h"
 #include "restriction.h"
 #include "primer.h"
@@ -263,6 +264,39 @@ Editor::Editor(bool preview):preview_(preview) {
     auto actOpen=fileMenu->addAction("Open…",QKeySequence::Open,this,&Editor::open);
     auto actSave=fileMenu->addAction("Save project",QKeySequence::Save,this,[this]{save();});
     fileMenu->addAction("Save project as…",QKeySequence::SaveAs,this,[this]{save(true);});
+    auto examplesMenu=fileMenu->addMenu("Open teaching examples");
+    examplesMenu->setObjectName("exampleMenu");
+    auto addSample=[this,examplesMenu](const QString &label,
+                                      const QString &resource,
+                                      const QString &alphabet,
+                                      const QString &note){
+        auto action=examplesMenu->addAction(label);
+        connect(action,&QAction::triggered,this,[this,resource,alphabet,note]{
+            if(!canReplace())return;
+            runSafely([&]{
+                QFile input(resource);
+                if(!input.open(QIODevice::ReadOnly))
+                    throw std::runtime_error("The selected example is missing from the application resources.");
+                Document d=parseFasta(QString::fromUtf8(input.readAll()));
+                d.alphabet=alphabet;
+                validateDocument(d);
+                d.warnings.clear();
+                d.warnings << note;
+                setDocument(d);
+                statusBar()->showMessage("Loaded bundled "+alphabet+" example · Save as a .helix project to keep your edits.");
+            });
+        });
+    };
+    addSample("DNA · six orchid fragments (300 nt)",
+        ":/examples/samples/dna_orchid_6.fasta","DNA",
+        "DNA demonstration: six 300-nt fragments from public orchid ITS/5.8S-containing records; see examples/samples/README.md.");
+    addSample("RNA · three simulated transcripts (300 nt)",
+        ":/examples/samples/rna_transcripts_3.fasta","RNA",
+        "RNA demonstration: in-silico T-to-U conversions of DNA fragments. Not validated mature RNA.");
+    addSample("Protein · five UniProt entries (110–396 aa)",
+        ":/examples/samples/proteins_5.fasta","Protein",
+        "Protein demonstration: five UniProt sequences are not necessarily homologous; no phylogenetic interpretation.");
+    fileMenu->addSeparator();
     auto addgeneMenu=fileMenu->addMenu("Addgene plasmids");
     addgeneMenu->addAction("Find plasmid by Addgene ID…",this,[this]{
         bool ok=false;
@@ -592,7 +626,10 @@ Editor::Editor(bool preview):preview_(preview) {
             "\nOnly the last 1 MiB is displayed; the complete file remains on disk.");
     });
     tools->addAction("Configure executables…",this,&Editor::toolSettings);
-    auto help=menuBar()->addMenu("&Help");help->addAction("About HelixEdit",this,[this]{QMessageBox::about(this,"HelixEdit 0.1.2 beta","Independent, offline sequence editor.\nOriginal implementation inspired by familiar sequence workflows.\nNot affiliated with BioEdit or SnapGene.\n\nDevelopment preview: verify results before research use.\nSee README for format and analysis limitations.");});
+    auto help=menuBar()->addMenu("&Help");
+    help->addAction("Check / update from GitHub source…",this,[this]{openSourceUpdater(this);});
+    help->addSeparator();
+    help->addAction("About HelixEdit",this,[this]{QMessageBox::about(this,"HelixEdit 0.1.3 beta","Independent, offline sequence editor.\nOriginal implementation inspired by familiar sequence workflows.\nNot affiliated with BioEdit or SnapGene.\n\nDevelopment preview: verify results before research use.\nSee README for format and analysis limitations.");});
     auto bar=addToolBar("Quick actions");
     bar->setObjectName("quickActions");
     bar->setMovable(false);
@@ -613,12 +650,19 @@ Editor::Editor(bool preview):preview_(preview) {
     bar->addAction(actOpen);bar->addAction(actSave);bar->addSeparator();
     bar->addAction(undo);bar->addAction(redo);bar->addSeparator();
     bar->addAction(copyAction);bar->addAction(pasteAction);
+    auto exampleButton=new QToolButton(bar);exampleButton->setText("Examples");
+    exampleButton->setToolTip("Load attributed offline teaching sequences");
+    exampleButton->setMenu(examplesMenu);exampleButton->setPopupMode(QToolButton::InstantPopup);
+    bar->addWidget(exampleButton);
     auto addQuick=bar->addAction("+ Sequence",this,&Editor::addSequence);
     addQuick->setToolTip("Add a DNA, RNA or protein record");
     auto spacer=new QWidget;spacer->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);
     bar->addWidget(spacer);
     auto offline=new QLabel("<b style='color:#35ae98'>● LOCAL</b>   <span style='color:#8d9bac'>BETA</span>  ");
     bar->addWidget(offline);
+    auto quickUpdater=bar->addAction("Update",this,[this]{openSourceUpdater(this);});
+    quickUpdater->setToolTip("Check GitHub main, then build, test and install from your local checkout");
+    quickUpdater->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
     auto root=new QWidget;setCentralWidget(root);
     auto layout=new QVBoxLayout(root);
     layout->setContentsMargins(6,6,6,4);layout->setSpacing(5);
@@ -693,8 +737,6 @@ Editor::Editor(bool preview):preview_(preview) {
     auto importA=actionFor(addgeneMenu,"Import Addgene GenBank into project…",QStyle::SP_DialogOpenButton);
     setRibbonIcon(undo,QStyle::SP_ArrowBack);
     setRibbonIcon(redo,QStyle::SP_ArrowForward);
-    addRibbonCategory("Home",{{"Open",openA},{"Save",saveA},
-                              {"Undo",undo},{"Redo",redo},{"Export",exportA}});
     addRibbonCategory("Sequence",{{"Add",addA},{"Rename",renameA},{"Remove",removeA},{"Insert gap",gapA},
                                   {"Reverse",reverseA},{"Translate",translateA},{"Find ORFs",orfA}});
     addRibbonCategory("Plasmid",{{"Addgene ID",addgeneA},{"Import GenBank",importA},
@@ -706,7 +748,8 @@ Editor::Editor(bool preview):preview_(preview) {
     molecule_=new QComboBox;molecule_->addItems({"DNA","RNA","Protein"});molecule_->setToolTip("Verify molecule type; short proteins cannot always be inferred from letters.");strip->addWidget(molecule_);
     search_=new QLineEdit;search_->setPlaceholderText("Find nucleotide or peptide motif…");search_->setMaximumWidth(260);strip->addWidget(search_);
     auto find=new QPushButton("Find next");strip->addWidget(find);layout->addLayout(strip);
-    notice_=new QLabel;notice_->setWordWrap(true);notice_->setStyleSheet("background:#fff0d8;color:#86602b;border-radius:7px;padding:7px;");layout->addWidget(notice_);
+    notice_=new QLabel;notice_->setObjectName("infoNotice");notice_->setWordWrap(false);
+    notice_->setMaximumHeight(25);notice_->setStyleSheet("background:#fff0d8;color:#86602b;border-radius:5px;padding:3px 8px;");layout->addWidget(notice_);
     auto split=new QSplitter(Qt::Horizontal,root);layout->addWidget(split,1);
     tabs_=new QTabWidget;tabs_->setObjectName("studioTabs");tabs_->setDocumentMode(true);
     tabs_->setMovable(false);split->addWidget(tabs_);
@@ -725,7 +768,7 @@ Editor::Editor(bool preview):preview_(preview) {
         else if(item=="Translate")connect(b,&QPushButton::clicked,this,&Editor::translateSelected);
         else connect(b,&QPushButton::clicked,this,&Editor::reverseSelected);
     }actions->addStretch();al->addLayout(actions);tabs_->addTab(alignment,"01  Alignment");
-    auto mapPage=new QWidget;auto ml=new QVBoxLayout(mapPage);mapTitle_=new QLabel;mapTitle_->setStyleSheet("font-size:16px;font-weight:bold;padding:12px;");ml->addWidget(mapTitle_);
+    auto mapPage=new QWidget;auto ml=new QVBoxLayout(mapPage);mapTitle_=new QLabel;mapTitle_->setStyleSheet("font-size:13px;font-weight:600;padding:4px;");ml->addWidget(mapTitle_);
     auto mapStrip=new QWidget(mapPage);mapStrip->setObjectName("mapToolStrip");
     auto mapStripLayout=new QHBoxLayout(mapStrip);
     mapStripLayout->setContentsMargins(5,1,5,1);mapStripLayout->setSpacing(8);
@@ -846,10 +889,7 @@ Editor::Editor(bool preview):preview_(preview) {
         dlg.exec();
     });
     auto mapButtons=new QHBoxLayout;
-    mapButtons->addWidget(primerButton);
-    mapButtons->addWidget(primer3Button);
     auto restrictionButton=new QPushButton("Restriction sites");
-    mapButtons->addWidget(restrictionButton);
     connect(restrictionButton,&QPushButton::clicked,this,[this]{
         if(model->document.alphabet=="Protein"){
             QMessageBox::information(this,"Restriction sites","Select a nucleotide project first.");
@@ -892,9 +932,8 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     enzymeLayout->addWidget(enzymeSearch);
     enzymeList_=new QListWidget;enzymeList_->setObjectName("enzymeExplorer");
     enzymeLayout->addWidget(enzymeList_,1);
-    auto enzymeReport=new QPushButton("Full recognition-site report");
-    enzymeLayout->addWidget(enzymeReport);
-    connect(enzymeReport,&QPushButton::clicked,restrictionButton,&QPushButton::click);
+    restrictionButton->setText("Full recognition-site report");
+    enzymeLayout->addWidget(restrictionButton);
     connect(enzymeSearch,&QLineEdit::textChanged,this,[this](const QString &filter){
         for(int i=0;i<enzymeList_->count();++i)
             enzymeList_->item(i)->setHidden(!enzymeList_->item(i)->text().contains(filter,Qt::CaseInsensitive));
@@ -944,19 +983,16 @@ auto topology=new QPushButton("Toggle linear / circular");mapButtons->addWidget(
     auto primerTitle=new QLabel("<b>Primer workspace</b>  ·  local CSV library, IUPAC-aware exact binding and Primer3");
     primerTitle->setWordWrap(true);primerLayout->addWidget(primerTitle);
     auto primerActions=new QHBoxLayout;
-    auto primerLibraryAction=new QPushButton("Open primer library");
-    auto primerDesignAction=new QPushButton("Design with Primer3");
+    primerButton->setText("Open primer library");
     auto primerRefresh=new QPushButton("Map saved primers");
-    primerActions->addWidget(primerLibraryAction);
-    primerActions->addWidget(primerDesignAction);
+    primerActions->addWidget(primerButton);
+    primerActions->addWidget(primer3Button);
     primerActions->addWidget(primerRefresh);
     primerActions->addStretch();primerLayout->addLayout(primerActions);
     auto primerSummary=new QPlainTextEdit;
     primerSummary->setReadOnly(true);primerSummary->setObjectName("primerExplorer");
     primerSummary->setPlaceholderText("Choose 'Map saved primers' to report exact binding matches for the active sequence.");
     primerLayout->addWidget(primerSummary,1);
-    connect(primerLibraryAction,&QPushButton::clicked,primerButton,&QPushButton::click);
-    connect(primerDesignAction,&QPushButton::clicked,primer3Button,&QPushButton::click);
     connect(primerRefresh,&QPushButton::clicked,this,[this,primerSummary]{
         if(model->document.alphabet=="Protein"){
             primerSummary->setPlainText("Primer binding requires a nucleotide project.");return;
