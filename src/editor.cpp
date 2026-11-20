@@ -399,6 +399,80 @@ Editor::Editor(bool preview):preview_(preview) {
     auto tools=menuBar()->addMenu("&Tools");
     tools->addAction("Align with MAFFT",this,[this]{align("mafft");});
     tools->addAction("Align with MUSCLE 5",this,[this]{align("muscle");});
+    auto blastAction=tools->addAction("BLAST+ against local database…",this,[this]{
+        if(busy())return;
+        const QString kind=model->document.alphabet=="Protein"?"blastp":"blastn";
+        QSettings settings;
+        QString exe=settings.value("tools/"+kind).toString();
+        if(exe.isEmpty())exe=QStandardPaths::findExecutable(kind);
+#ifdef Q_OS_MACOS
+        if(exe.isEmpty()&&QFileInfo::exists("/opt/homebrew/bin/"+kind))
+            exe="/opt/homebrew/bin/"+kind;
+#endif
+        if(exe.isEmpty()||!QFileInfo(exe).isExecutable()){
+            QMessageBox::information(this,"BLAST+ not found",
+                "Install NCBI BLAST+ and configure the "+kind+" executable in Tools → Configure executables.");
+            return;
+        }
+        bool ok=false;
+        const QString db=QInputDialog::getText(this,"Local BLAST database",
+            "Database prefix (created with makeblastdb; no shell commands):",
+            QLineEdit::Normal,settings.value("blast/database").toString(),&ok).trimmed();
+        if(!ok||db.isEmpty())return;
+        if(!QFileInfo::exists(db+".nin")&&!QFileInfo::exists(db+".pin")&&
+           !QFileInfo::exists(db+".ndb")&&!QFileInfo::exists(db+".pdb")){
+            QMessageBox::warning(this,"BLAST database",
+                "No recognizable BLAST index found at this prefix. "
+                "Create a nucleotide/protein database with makeblastdb first.");
+            return;
+        }
+        settings.setValue("blast/database",db);
+        const auto &record=model->document.records[activeRow()];
+        const QString query=ungapped(record.sequence).toUpper();
+        if(query.isEmpty()||query.contains(QRegularExpression(
+            model->document.alphabet=="Protein"?"[^A-Z*]":"[^ACGTURYSWKMBDHVN]"))){
+            QMessageBox::warning(this,"BLAST query","Active sequence contains unsupported symbols.");return;
+        }
+        QTemporaryDir dir;
+        if(!dir.isValid()){QMessageBox::warning(this,"BLAST","Cannot create temporary workspace.");return;}
+        const QString queryPath=dir.filePath("query.fa");
+        QFile file(queryPath);
+        if(!file.open(QIODevice::WriteOnly)){QMessageBox::warning(this,"BLAST","Cannot write query.");return;}
+        const QByteArray input=(">helix_query\\n"+query+"\\n").toUtf8();
+        file.write(input);file.close();
+        const QStringList args={"-query",queryPath,"-db",db,"-outfmt",
+            "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore",
+            "-max_target_seqs","50"};
+        QProcess job;
+        job.setProgram(exe);
+        job.setArguments(args);
+        job.setWorkingDirectory(dir.path());
+        job.start();
+        if(!job.waitForStarted(5000)){QMessageBox::warning(this,"BLAST","Unable to start BLAST+.");return;}
+        if(!job.waitForFinished(60000)){
+            job.kill();job.waitForFinished();
+            QMessageBox::warning(this,"BLAST","Search exceeded the 60-second preview limit.");return;
+        }
+        const QString stdoutText=QString::fromUtf8(job.readAllStandardOutput());
+        const QString stderrText=QString::fromUtf8(job.readAllStandardError());
+        const QString hash=QString::fromLatin1(QCryptographicHash::hash(input,QCryptographicHash::Sha256).toHex());
+        const QString log=QString("UTC: %1\\nTool: %2\\nExecutable: %3\\n"
+            "Database: %4\\nQuery SHA256: %5\\nArguments: %6\\nExit code: %7\\n"
+            "STDERR:\\n%8\\nRESULTS (BLAST tabular outfmt 6):\\n%9\\n")
+            .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate),kind,exe,db,hash,
+                 args.join(" "),QString::number(job.exitCode()),stderrText,stdoutText);
+        const QString logFolder=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QDir().mkpath(logFolder);
+        QFile audit(QDir(logFolder).filePath("analysis-history.log"));
+        if(audit.open(QIODevice::WriteOnly|QIODevice::Append)){
+            audit.write(("\\n===== BLAST+ RUN =====\\n"+log).toUtf8());
+            audit.close();
+        }
+        if(log_)log_->appendPlainText(log);
+        if(job.exitStatus()!=QProcess::NormalExit||job.exitCode()!=0)
+            QMessageBox::warning(this,"BLAST+ failed",stderrText.left(2000));
+        else showAnalysis("BLAST+ local results",log);
+    });
     tools->addAction("Configure executables…",this,&Editor::toolSettings);
     auto help=menuBar()->addMenu("&Help");help->addAction("About HelixEdit",this,[this]{QMessageBox::about(this,"HelixEdit 0.1.0","Independent, offline sequence editor.\nOriginal implementation inspired by familiar sequence workflows.\nNot affiliated with BioEdit or SnapGene.\n\nDevelopment preview: verify results before research use.\nSee README for format and analysis limitations.");});
     auto bar=addToolBar("Workspace");bar->setMovable(false);bar->setToolButtonStyle(Qt::ToolButtonTextOnly);
@@ -490,6 +564,7 @@ Editor::Editor(bool preview):preview_(preview) {
     auto statsA=actionFor(analysis,"Sequence statistics…",QStyle::SP_FileDialogDetailedView);
     auto distanceA=actionFor(analysis,"p-distance matrix…",QStyle::SP_FileDialogContentsView);
     auto phyloA=actionFor(analysis,"Export PHYLIP for phylogenetics…",QStyle::SP_DialogSaveButton);
+    auto blastA=actionFor(tools,"BLAST+ against local database…",QStyle::SP_FileDialogContentsView);
     auto mafftA=actionFor(tools,"Align with MAFFT",QStyle::SP_BrowserReload);
     auto muscleA=actionFor(tools,"Align with MUSCLE 5",QStyle::SP_BrowserReload);
     auto configA=actionFor(tools,"Configure executables…",QStyle::SP_FileDialogDetailedView);
@@ -503,7 +578,7 @@ Editor::Editor(bool preview):preview_(preview) {
                                   {"Reverse",reverseA},{"Translate",translateA},{"Find ORFs",orfA}});
     addRibbonCategory("Plasmid",{{"Addgene ID",addgeneA},{"Import GenBank",importA},
                                  {"Restriction",restrictA},{"Export GB",gbExportA},{"Assemble",assemblyA}});
-    addRibbonCategory("Analysis",{{"MAFFT",mafftA},{"MUSCLE",muscleA},
+    addRibbonCategory("Analysis",{{"MAFFT",mafftA},{"MUSCLE",muscleA},{"BLAST+",blastA},
                                   {"Consensus",consensusA},{"Matrix",matrixA},{"p-distance",distanceA},{"Statistics",statsA},{"PHYLIP",phyloA},{"Tool settings",configA}});
     layout->addWidget(ribbon);
     auto strip=new QHBoxLayout;auto title=new QLabel("<b style='font-size:19px'>Your sequences, in focus.</b>");strip->addWidget(title);strip->addStretch();
