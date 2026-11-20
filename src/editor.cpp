@@ -751,7 +751,12 @@ Editor::Editor(bool preview):preview_(preview) {
     bar->setMovable(false);
     bar->setIconSize(QSize(17,17));
     bar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-    auto brand=new QLabel("<b style='font-size:15px'>⬡ HelixEdit</b>  ");
+    auto logo=new QLabel(bar);
+    logo->setObjectName("brandIcon");
+    logo->setPixmap(qApp->windowIcon().pixmap(QSize(25,25)));
+    logo->setFixedSize(30,28);
+    bar->addWidget(logo);
+    auto brand=new QLabel("<b style='font-size:15px'>HelixEdit</b>  ");
     bar->addWidget(brand);
     actOpen->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
     actSave->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
