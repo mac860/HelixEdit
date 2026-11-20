@@ -2130,6 +2130,11 @@ void Editor::showSettings() {
     startPage->setCurrentText(stored.value("workspace/startTab","Map").toString());
     appearanceForm->addRow("Default document view",startPage);
     appearanceLayout->addLayout(appearanceForm);
+    auto sidebarPreference=new QCheckBox("Show context tools sidebar on startup");
+    sidebarPreference->setObjectName("sidebarVisiblePreference");
+    sidebarPreference->setChecked(stored.value("workspace/toolPanelVisible",false).toBool());
+    sidebarPreference->setToolTip("The narrow icon-only activity rail stays available when tools are hidden.");
+    appearanceLayout->addWidget(sidebarPreference);
     auto themeNote=new QLabel("Themes apply to menus, editor panels, dialogs and the plasmid map. "
         "Choose <b>Save settings</b> to apply your changes. "
         "The startup view is used for newly opened sessions.");
@@ -2302,6 +2307,7 @@ void Editor::showSettings() {
     connect(reset,&QPushButton::clicked,&dialog,[=]{
         theme->setCurrentText("Dark");
         startPage->setCurrentText("Map");
+        sidebarPreference->setChecked(false);
         mapEnzymes->setChecked(true);
         mapFeatures->setChecked(true);
         uniquePreference->setChecked(true);
@@ -2340,6 +2346,7 @@ void Editor::showSettings() {
         }
         QSettings settings("HelixEdit","HelixEdit");
         settings.setValue("workspace/startTab",startPage->currentText());
+        settings.setValue("workspace/toolPanelVisible",sidebarPreference->isChecked());
         settings.setValue("map/showEnzymes",mapEnzymes->isChecked());
         settings.setValue("map/showFeatures",mapFeatures->isChecked());
         settings.setValue("map/uniqueCuttersOnly",uniquePreference->isChecked());
@@ -2352,6 +2359,8 @@ void Editor::showSettings() {
         for(auto it=toolFields.cbegin();it!=toolFields.cend();++it)
             settings.setValue("tools/"+it.key(),it.value()->text().trimmed());
         applyTheme(theme->currentText());
+        if(auto *sidebar=findChild<QToolButton*>("toggleWorkspaceTools"))
+            sidebar->setChecked(sidebarPreference->isChecked());
         if(mapEnzymeToggle_)mapEnzymeToggle_->setChecked(mapEnzymes->isChecked());
         if(mapFeatureToggle_)mapFeatureToggle_->setChecked(mapFeatures->isChecked());
         if(uniqueCuttersToggle_)uniqueCuttersToggle_->setChecked(uniquePreference->isChecked());
