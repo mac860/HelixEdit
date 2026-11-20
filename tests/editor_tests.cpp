@@ -45,6 +45,70 @@ private slots:
             QCOMPARE(editor.currentPath(),QString());
         }
     }
+    void settingsCentralizePreferencesAndAboutCredits() {
+        Editor editor(true);
+        auto settingsAction=editor.findChild<QAction*>("openSettings");
+        QVERIFY(settingsAction);
+        QVERIFY(editor.menuBar());
+        bool foundSettingsMenu=false,foundAppearanceMenu=false;
+        for(const auto *action:editor.menuBar()->actions()){
+            if(action->text()=="&Settings")foundSettingsMenu=true;
+            if(action->text()=="&Appearance")foundAppearanceMenu=true;
+        }
+        QVERIFY(foundSettingsMenu);
+        QVERIFY(!foundAppearanceMenu);
+        QString savedPrevious=QSettings("HelixEdit","HelixEdit")
+            .value("appearance/theme","Dark").toString();
+        bool appeared=false, controlsReady=false;
+        QTimer::singleShot(0,&editor,[&]{
+            auto *dialog=editor.findChild<QDialog*>("helixSettingsDialog");
+            if(!dialog)return;
+            appeared=true;
+            auto *pages=dialog->findChild<QTabWidget*>("preferencesTabs");
+            auto *theme=dialog->findChild<QComboBox*>("themePreference");
+            auto *source=dialog->findChild<QLineEdit*>("updateSourcePreference");
+            auto *autosave=dialog->findChild<QComboBox*>("autosavePreference");
+            auto *enzyme=dialog->findChild<QCheckBox*>("enzymeLabelsPreference");
+            controlsReady=pages && pages->count()==4 && theme && source && autosave && enzyme;
+            if(controlsReady) {
+                theme->setCurrentText("Dracula");
+                auto *buttonBox=dialog->findChild<QDialogButtonBox*>();
+                if(buttonBox && buttonBox->button(QDialogButtonBox::Save))
+                    buttonBox->button(QDialogButtonBox::Save)->click();
+                else dialog->reject();
+            } else dialog->reject();
+        });
+        settingsAction->trigger();
+        QVERIFY(appeared);
+        QVERIFY(controlsReady);
+        QCOMPARE(savedTheme(),QString("Dracula"));
+        applyTheme(savedPrevious);
+        bool aboutVisible=false,hasCredit=false,hasRepo=false,hasEmail=false;
+        // The Help action owns the submenu; use its exact text rather than traversal order.
+        QAction *aboutAction=nullptr;
+        for(auto *menuAction:editor.menuBar()->actions()){
+            if(!menuAction->menu() || menuAction->text()!="&Help")continue;
+            for(auto *action:menuAction->menu()->actions())
+                if(action->text()=="About HelixEdit")aboutAction=action;
+        }
+        QVERIFY(aboutAction);
+        QTimer::singleShot(0,&editor,[&]{
+            auto *dialog=editor.findChild<QDialog*>("helixAboutDialog");
+            if(!dialog)return;
+            aboutVisible=true;
+            QString visible;
+            for(const auto *label:dialog->findChildren<QLabel*>())visible+=label->text();
+            hasCredit=visible.contains("Developed and edited by Wael H");
+            hasRepo=visible.contains("https://github.com/mac860/HelixEdit");
+            hasEmail=visible.contains("waelye@gmail.com");
+            dialog->reject();
+        });
+        aboutAction->trigger();
+        QVERIFY(aboutVisible);
+        QVERIFY(hasCredit);
+        QVERIFY(hasRepo);
+        QVERIFY(hasEmail);
+    }
     void updaterEntryIsAvailable() {
         Editor editor(true);
         bool found=false;
