@@ -14,10 +14,19 @@ inline QVector<RestrictionSite> findRestrictionSites(const Record &record) {
  seq.replace('U','T');
  const int n=seq.size();
  if(n==0)return result;
+ // A focused set of exact, nondegenerate PALINDROMIC recognition motifs.
+ // Recognition starts are reported, not cleavage coordinates. No methylation
+ // or buffer compatibility is inferred. See NEB specificity catalog.
  const QVector<QPair<QString,QString>> motifs={
-  {"EcoRI","GAATTC"},{"BamHI","GGATCC"},{"HindIII","AAGCTT"},
-  {"XhoI","CTCGAG"},{"NotI","GCGGCCGC"},{"PstI","CTGCAG"},
-  {"NdeI","CATATG"},{"NcoI","CCATGG"}
+  {"AatII","GACGTC"},{"ApaI","GGGCCC"},{"BamHI","GGATCC"},
+  {"BglII","AGATCT"},{"ClaI","ATCGAT"},{"EcoRI","GAATTC"},
+  {"HindIII","AAGCTT"},{"HpaI","GTTAAC"},{"KpnI","GGTACC"},
+  {"MluI","ACGCGT"},{"NcoI","CCATGG"},{"NdeI","CATATG"},
+  {"NheI","GCTAGC"},{"NotI","GCGGCCGC"},{"NruI","TCGCGA"},
+  {"NsiI","ATGCAT"},{"PstI","CTGCAG"},{"PvuII","CAGCTG"},
+  {"SacI","GAGCTC"},{"SalI","GTCGAC"},{"SmaI","CCCGGG"},
+  {"SpeI","ACTAGT"},{"SphI","GCATGC"},{"SwaI","ATTTAAAT"},
+  {"XbaI","TCTAGA"},{"XhoI","CTCGAG"}
  };
  for(const auto &entry:motifs) {
   const QString motif=entry.second;
