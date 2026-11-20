@@ -114,31 +114,31 @@ QString genbank(const Document &d) {
         if(r.name.contains(QRegularExpression("\\s"))) fail("GenBank LOCUS identifiers cannot contain spaces; rename the record.");
         const QString locus=r.name.left(16);
         if(locus.isEmpty()) fail("GenBank LOCUS identifier is missing.");
-        out+=QString("LOCUS       %1 %2 bp    %3     %4\\n")
+        out+=QString("LOCUS       %1 %2 bp    %3     %4\n")
             .arg(locus.leftJustified(16)).arg(seq.size(),7)
             .arg(d.alphabet=="RNA"?"RNA":"DNA",r.circular?"circular":"linear");
-        out+="DEFINITION  Exported from HelixEdit; verify annotation and metadata.\\n";
-        out+="FEATURES             Location/Qualifiers\\n";
+        out+="DEFINITION  Exported from HelixEdit; verify annotation and metadata.\n";
+        out+="FEATURES             Location/Qualifiers\n";
         for(const auto &f:r.features) {
             if(f.type.trimmed().isEmpty() || f.type.contains(QRegularExpression("\\s")))
                 fail("GenBank feature type must be a single nonempty token.");
             const QString position=QString("%1..%2").arg(f.start+1).arg(f.end);
             const QString location=f.reverse?"complement("+position+")":position;
-            out+="     "+f.type.leftJustified(16)+location+"\\n";
+            out+="     "+f.type.leftJustified(16)+location+"\n";
             QString label=f.name;
             label.replace('"','\'');
-            label.replace('\\n',' ');
+            label.replace('\n',' ');
             label.replace('\\r',' ');
-            out+="                     /label=\\\""+label+"\\\"\\n";
+            out+="                     /label=\""+label+"\"\n";
         }
-        out+="ORIGIN\\n";
+        out+="ORIGIN\n";
         for(int i=0;i<seq.size();i+=60) {
             out+=QString("%1 ").arg(i+1,9);
             const QString chunk=seq.mid(i,60);
             for(int j=0;j<chunk.size();j+=10)out+=chunk.mid(j,10)+" ";
-            out+="\\n";
+            out+="\n";
         }
-        out+="//\\n";
+        out+="//\n";
     }
     return out;
 }
