@@ -37,6 +37,8 @@ jobs:
         run: |
           bash -n scripts/update_from_source.sh
           bash -n scripts/build_ubuntu_deb.sh
+          bash -n scripts/install_ubuntu_deb.sh
+          bash -n scripts/test_install_staging.sh
       - name: Configure and build
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
