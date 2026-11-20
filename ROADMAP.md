@@ -95,6 +95,20 @@ HelixEdit is one native offline-first application with three complementary works
 
 **Access constraints:** Addgene requires sign-in for sequence downloads; its developer API and bulk datasets require approved access. The current integration deliberately delegates sign-in/download to the browser. No direct authenticated Addgene API connection is claimed.
 
+## Primer Studio — first implementation (source committed; unverified build)
+
+The Plasmid Studio map toolbar now has **Primer library** and **Design with Primer3** actions.
+
+- Local primer library: CSV lines `name,sequence,notes` stored under the operating system's application-data directory, edited and saved in a dialog; no cloud service or proprietary SnapGene assets.
+- Primer binding: forward/reverse exact matches, IUPAC ambiguous nucleotide matching, circular-origin recognition and per-hit coordinate reporting.
+- Primer properties: GC% and a **rough Wallace 2(A+T)+4(G+C) estimate**. This is **not** Primer3's nearest-neighbor thermodynamic Tm calculation and should not be used as a validated assay-design result.
+- Optional **primer3_core**: locates the installed executable on PATH, runs the upstream Primer3 algorithm on a selected unambiguous nucleotide template (>=60 bases) with a basic five-pair generic design request, and displays raw Boulder-IO results. No Primer3 executable or algorithm is bundled, and no particular upstream release version has been verified.
+- Automated tests for binding, circular recognition, CSV parsing and simple properties have been added, but must run in CI before the feature is described as verified.
+
+**Cloning design remains planned**, not implemented: primer overhang design, Gibson/NEBuilder-style overlaps, Golden Gate Type IIS orientation, restriction-ligation junction checks, off-target scoring, hairpin/dimer assessment, genome-wide specificity and annotated amplicon previews. These require validated scientific algorithms and reference fixtures, not merely UI controls.
+
+**Next engineering checks:** compile on macOS arm64 and Ubuntu x86_64/arm64; test real primer3_core versions; verify Boulder-IO error handling, output parsing, mismatch/degeneracy behavior and 3'-end specificity; migrate the synchronous process to a cancellable asynchronous worker; introduce a versioned SQLite primer database with import/export and audit history. Do not imply compatibility with SnapGene's proprietary algorithms or databases.
+
 ## P0 — Beta release gates
 1. Build, CTest, GUI smoke tests and packages on Ubuntu 24.04+ x86_64 and ARM64 and macOS ARM64.
 2. Validate actual Mac M1 interaction, file dialogs, keyboard, graphics and app bundle.
