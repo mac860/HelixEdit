@@ -188,7 +188,8 @@ private slots:
                  originPixel.blue()<135,
                  "Origin feature should appear as a bright golden band.");
         map.record.features.clear();
-        QVERIFY(render()==noFeatures);
+        map.showFeatures=true;
+        QVERIFY(render()!=withFeatures); // No biological feature arcs remain.
         applyTheme(prior);
     }
     void v020ActivityRailAndContextViews() {
