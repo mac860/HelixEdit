@@ -722,7 +722,30 @@ Editor::Editor(bool preview):preview_(preview) {
         else connect(b,&QPushButton::clicked,this,&Editor::reverseSelected);
     }actions->addStretch();al->addLayout(actions);tabs_->addTab(alignment,"01  Alignment");
     auto mapPage=new QWidget;auto ml=new QVBoxLayout(mapPage);mapTitle_=new QLabel;mapTitle_->setStyleSheet("font-size:16px;font-weight:bold;padding:12px;");ml->addWidget(mapTitle_);
-    map_=new MapView;ml->addWidget(map_,1);
+    auto mapStrip=new QWidget(mapPage);mapStrip->setObjectName("mapToolStrip");
+    auto mapStripLayout=new QHBoxLayout(mapStrip);
+    mapStripLayout->setContentsMargins(5,1,5,1);mapStripLayout->setSpacing(8);
+    auto enzymeLabels=new QCheckBox("Enzyme labels");enzymeLabels->setChecked(true);
+    enzymeLabels->setToolTip("Show exact recognition sites from the built-in eight-enzyme set");
+    auto featureLabels=new QCheckBox("Features");featureLabels->setChecked(true);
+    mapStripLayout->addWidget(enzymeLabels);mapStripLayout->addWidget(featureLabels);
+    mapStripLayout->addStretch();
+    auto zoomOut=new QToolButton(mapStrip);zoomOut->setText("−");
+    zoomOut->setToolTip("Zoom out plasmid map");
+    auto zoomReset=new QToolButton(mapStrip);zoomReset->setText("100%");
+    zoomReset->setToolTip("Reset map zoom");
+    auto zoomIn=new QToolButton(mapStrip);zoomIn->setText("+");
+    zoomIn->setToolTip("Zoom in plasmid map");
+    mapStripLayout->addWidget(new QLabel("Map zoom"));mapStripLayout->addWidget(zoomOut);
+    mapStripLayout->addWidget(zoomReset);mapStripLayout->addWidget(zoomIn);
+    ml->addWidget(mapStrip);
+    map_=new MapView;map_->setObjectName("plasmidMap");ml->addWidget(map_,1);
+    connect(enzymeLabels,&QCheckBox::toggled,map_,[this](bool on){map_->showEnzymes=on;map_->update();});
+    connect(featureLabels,&QCheckBox::toggled,map_,[this](bool on){map_->showFeatures=on;map_->update();});
+    connect(zoomIn,&QToolButton::clicked,map_,[this]{map_->setZoom(map_->zoom+.1);});
+    connect(zoomOut,&QToolButton::clicked,map_,[this]{map_->setZoom(map_->zoom-.1);});
+    connect(zoomReset,&QToolButton::clicked,map_,[this]{map_->setZoom(1.0);});
+
     auto primer3Button=new QPushButton("Design with Primer3");
     connect(primer3Button,&QPushButton::clicked,this,[this]{
         if(model->document.alphabet=="Protein"){
