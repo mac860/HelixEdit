@@ -215,6 +215,80 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
     }
     p.restore();
 }
+void CompositionView::paintEvent(QPaintEvent *) {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing,true);
+    const bool dark=isDarkTheme(savedTheme());
+    const QColor text(dark?"#e7eefb":"#22354d");
+    const QColor muted(dark?"#abb9cf":"#647b98");
+    p.setPen(Qt::NoPen);
+    p.setBrush(dark?QColor(37,47,66,225):QColor(255,255,255,226));
+    p.drawRoundedRect(rect().adjusted(1,1,-1,-1),11,11);
+    const QString seq=ungapped(sequence_).toUpper();
+    struct Part {QString name;QColor color;int count=0;};
+    QVector<Part> parts;
+    if(alphabet_=="Protein") {
+        parts={{"Hydrophobic",QColor("#41c7ad"),0},{"Basic",QColor("#9d82f9"),0},
+               {"Acidic",QColor("#fb7b91"),0},{"Polar",QColor("#67bdf7"),0},
+               {"Other",QColor("#ffbd56"),0}};
+        for(const auto c:seq) {
+            int category=4;
+            if(QString("AVLIMFWY").contains(c))category=0;
+            else if(QString("KRH").contains(c))category=1;
+            else if(QString("DE").contains(c))category=2;
+            else if(QString("STNQ").contains(c))category=3;
+            ++parts[category].count;
+        }
+    } else {
+        parts={{"A",QColor("#32cba0"),0},{"C",QColor("#5baaf5"),0},
+               {"G",QColor("#ffc15a"),0},{alphabet_=="RNA"?"U":"T",QColor("#ff7496"),0},
+               {"Other",QColor("#b7a9d6"),0}};
+        for(const auto c:seq) {
+            int category=4;
+            if(c=='A')category=0;
+            else if(c=='C')category=1;
+            else if(c=='G')category=2;
+            else if(c==(alphabet_=="RNA"?'U':'T'))category=3;
+            ++parts[category].count;
+        }
+    }
+    p.setPen(text);
+    QFont title=p.font();title.setBold(true);title.setPointSize(10);p.setFont(title);
+    p.drawText(QRect(12,8,170,20),Qt::AlignLeft,
+        alphabet_=="Protein"?"AMINO ACID PROFILE":"BASE COMPOSITION");
+    QFont standard=title;standard.setBold(false);standard.setPointSize(9);p.setFont(standard);
+    p.setPen(muted);
+    p.drawText(QRect(12,30,165,20),Qt::AlignLeft,
+        QString("%1 %2 · no gaps").arg(QLocale().toString(seq.size()))
+                                  .arg(alphabet_=="Protein"?"aa":"nt"));
+    const QRectF chart(185,12,qMax<qreal>(10,width()-198),17);
+    QPainterPath path;path.addRoundedRect(chart,7,7);
+    p.setPen(Qt::NoPen);p.setBrush(dark?QColor("#4a5266"):QColor("#e8edf5"));
+    p.drawRoundedRect(chart,7,7);
+    if(seq.isEmpty())return;
+    p.save();p.setClipPath(path);
+    qreal left=chart.left();
+    for(const auto &part:parts) {
+        if(part.count==0)continue;
+        const qreal w=chart.width()*part.count/seq.size();
+        p.fillRect(QRectF(left,chart.top(),w+0.15,chart.height()),part.color);
+        left+=w;
+    }
+    p.restore();
+    QFont legend=p.font();legend.setPointSize(9);p.setFont(legend);
+    qreal x=chart.left();
+    for(const auto &part:parts) {
+        const qreal available=qMax<qreal>(67,(chart.width()-12)/parts.size());
+        p.setPen(Qt::NoPen);p.setBrush(part.color);
+        p.drawRoundedRect(QRectF(x,42,9,9),3,3);
+        p.setPen(text);
+        const QString legendText=QString("%1 %2%")
+            .arg(part.name).arg(qRound(100.0*part.count/seq.size()));
+        p.drawText(QRectF(x+13,35,available-13,21),Qt::AlignVCenter,
+            QFontMetrics(legend).elidedText(legendText,Qt::ElideRight,int(available-15)));
+        x+=available;
+    }
+}
 class Change : public QUndoCommand {
     Editor *editor_; Document before_,after_;
 public:
@@ -787,6 +861,7 @@ Editor::Editor(bool preview):preview_(preview) {
     tabs_->setMovable(false);split->addWidget(tabs_);
     auto alignment=new QWidget;auto al=new QVBoxLayout(alignment);al->setContentsMargins(0,8,0,0);
     auto legend=new QLabel("   <b style='color:#199c73'>A</b> adenine   <b style='color:#408bd0'>C</b> cytosine   <b style='color:#b18527'>G</b> guanine   <b style='color:#cf6281'>T/U</b> thymine / uracil   ·   Double-click a residue to edit");legend->setObjectName("residueLegend");al->addWidget(legend);
+    composition_=new CompositionView(alignment);al->addWidget(composition_);
     table=new QTableView;table->setObjectName("alignment");table->setModel(model);table->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
     table->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);table->horizontalHeader()->setMinimumSectionSize(24);table->horizontalHeader()->setDefaultSectionSize(28);
     table->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);table->verticalHeader()->setDefaultSectionSize(35);table->verticalHeader()->setFixedWidth(205);table->verticalHeader()->setTextElideMode(Qt::ElideRight);
@@ -1228,6 +1303,7 @@ void Editor::updateSelection() {
         QSignalBlocker block(navigator_);
         navigator_->setCurrentRow(row);
     }
+    if(composition_)composition_->setSequence(r.sequence,doc.alphabet);
     map_->record=r;
     map_->alphabet=doc.alphabet;
     map_->update();
