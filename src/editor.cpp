@@ -1547,7 +1547,8 @@ Editor::Editor(bool preview):preview_(preview) {
         if(r.circular==on)return;
         r.circular=on;
         d.warnings.removeAll("FASTA carries no topology/feature annotations; confirm circularity and import sequence-matched GenBank annotations separately.");
-        d.warnings.append("Topology set manually in HelixEdit. Confirm circularity against laboratory or source records.");
+        const QString topologyNote="Topology set manually in HelixEdit. Confirm circularity against laboratory or source records.";
+        if(!d.warnings.contains(topologyNote))d.warnings.append(topologyNote);
         commit(d,"Set molecule topology");
     });
     connect(feat,&QPushButton::clicked,this,&Editor::addFeature);
