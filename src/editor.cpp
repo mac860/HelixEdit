@@ -9,6 +9,7 @@
 #include <QDesktopServices>
 #include <cmath>
 #include <stdexcept>
+#include <algorithm>
 #ifdef Q_OS_UNIX
 #include <signal.h>
 #include <unistd.h>
@@ -211,7 +212,7 @@ public:
     void redo() override {editor_->applyDocument(after_);}
 };
 Editor::Editor(bool preview):preview_(preview) {
-    setWindowTitle("HelixEdit");resize(1180,760);setMinimumSize(860,580);
+    setWindowTitle("HelixEdit");resize(1260,780);setMinimumSize(900,600);
     model=new AlignmentModel(this);history=new QUndoStack(this);history->setUndoLimit(30);
     applyTheme(savedTheme());
     auto appearance=menuBar()->addMenu("&Appearance");
@@ -335,13 +336,13 @@ Editor::Editor(bool preview):preview_(preview) {
     auto undo=history->createUndoAction(this,"Undo");undo->setShortcut(QKeySequence::Undo);edit->addAction(undo);
     auto redo=history->createRedoAction(this,"Redo");redo->setShortcut(QKeySequence::Redo);edit->addAction(redo);
     edit->addAction("Add sequence…",this,&Editor::addSequence);
-    edit->addAction("Copy selection as FASTA",QKeySequence::Copy,this,[this]{
+    auto copyAction=edit->addAction("Copy selection as FASTA",QKeySequence::Copy,this,[this]{
         auto ranges=table->selectionModel()->selection();if(ranges.size()!=1){statusBar()->showMessage("Select one rectangular block to copy as FASTA.");return;}
         const auto range=ranges.first();Document block;block.alphabet=model->document.alphabet;
         for(int row=range.top();row<=range.bottom();++row){auto r=model->document.records[row];r.sequence=r.sequence.mid(range.left(),range.width());r.features.clear();r.circular=false;if(!r.sequence.isEmpty())block.records.append(r);}
         QGuiApplication::clipboard()->setText(fasta(block));statusBar()->showMessage("Selected block copied as sequence-only FASTA.");
     });
-    edit->addAction("Paste new FASTA records",QKeySequence::Paste,this,[this]{if(busy())return;runSafely([&]{auto incoming=parseFasta(QGuiApplication::clipboard()->text());auto d=model->document;d.records+=incoming.records;commit(d,"Paste sequences");});});
+    auto pasteAction=edit->addAction("Paste new FASTA records",QKeySequence::Paste,this,[this]{if(busy())return;runSafely([&]{auto incoming=parseFasta(QGuiApplication::clipboard()->text());auto d=model->document;d.records+=incoming.records;commit(d,"Paste sequences");});});
     edit->addAction("Rename active sequence…",this,[this]{if(busy())return;bool ok=false;int row=activeRow();auto name=QInputDialog::getText(this,"Rename sequence","Name",QLineEdit::Normal,model->document.records[row].name,&ok);if(ok)runSafely([&]{auto d=model->document;d.records[row].name=name.trimmed();commit(d,"Rename sequence");});});
     edit->addAction("Remove selected sequences…",this,[this]{
         if(busy())return;
@@ -592,54 +593,53 @@ Editor::Editor(bool preview):preview_(preview) {
     });
     tools->addAction("Configure executables…",this,&Editor::toolSettings);
     auto help=menuBar()->addMenu("&Help");help->addAction("About HelixEdit",this,[this]{QMessageBox::about(this,"HelixEdit 0.1.0","Independent, offline sequence editor.\nOriginal implementation inspired by familiar sequence workflows.\nNot affiliated with BioEdit or SnapGene.\n\nDevelopment preview: verify results before research use.\nSee README for format and analysis limitations.");});
-    auto bar=addToolBar("Workspace");bar->setMovable(false);bar->setToolButtonStyle(Qt::ToolButtonTextOnly);
-    auto brand=new QLabel("<b style='color:#7450cd;font-size:21px'>◉ HelixEdit</b> <span style='color:#9b8eaf'> / sequence studio</span>   ");bar->addWidget(brand);
-    bar->addAction(actOpen);bar->addAction(actSave);bar->addSeparator();bar->addAction(undo);bar->addAction(redo);
-    bar->addAction("+ Sequence",this,&Editor::addSequence);
-    auto spacer=new QWidget;spacer->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);bar->addWidget(spacer);
-    auto offline=new QLabel("<b style='color:#159884'>● OFFLINE</b>   <span style='color:#9d90ae'>PREVIEW 0.1</span>  ");bar->addWidget(offline);
-    auto root=new QWidget;setCentralWidget(root);auto layout=new QVBoxLayout(root);layout->setContentsMargins(18,13,18,8);layout->setSpacing(9);
+    auto bar=addToolBar("Quick actions");
+    bar->setObjectName("quickActions");
+    bar->setMovable(false);
+    bar->setIconSize(QSize(17,17));
+    bar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+    auto brand=new QLabel("<b style='font-size:15px'>⬡ HelixEdit</b>  ");
+    bar->addWidget(brand);
+    actOpen->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
+    actSave->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
+    undo->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
+    redo->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
+    copyAction->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
+    pasteAction->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
+    bar->addAction(actOpen);bar->addAction(actSave);bar->addSeparator();
+    bar->addAction(undo);bar->addAction(redo);bar->addSeparator();
+    bar->addAction(copyAction);bar->addAction(pasteAction);
+    auto addQuick=bar->addAction("+ Sequence",this,&Editor::addSequence);
+    addQuick->setToolTip("Add a DNA, RNA or protein record");
+    auto spacer=new QWidget;spacer->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Preferred);
+    bar->addWidget(spacer);
+    auto offline=new QLabel("<b style='color:#35ae98'>● LOCAL</b>   <span style='color:#8d9bac'>BETA</span>  ");
+    bar->addWidget(offline);
+    auto root=new QWidget;setCentralWidget(root);
+    auto layout=new QVBoxLayout(root);
+    layout->setContentsMargins(6,6,6,4);layout->setSpacing(5);
     // Compact, category-based ribbon: each button triggers the existing menu action,
     // keeping keyboard shortcuts, enablement and behavior in one place.
     auto ribbon=new QTabWidget(root);
     ribbon->setObjectName("commandRibbon");
     ribbon->setDocumentMode(true);
-    ribbon->setMaximumHeight(112);
-    ribbon->setMinimumHeight(92);
-    ribbon->setStyleSheet(
-        "QTabWidget#commandRibbon::pane {border:1px solid rgba(148,120,210,100);"
-        "border-radius:13px;background:rgba(139,104,218,25);}"
-        "QTabWidget#commandRibbon QTabBar::tab {padding:7px 17px;margin-right:3px;"
-        "border:1px solid rgba(142,125,193,70);border-radius:9px;"
-        "background:rgba(130,110,180,30);font-weight:600;}"
-        "QTabWidget#commandRibbon QTabBar::tab:selected {"
-        "background:rgba(138,103,226,90);border:1px solid rgba(138,103,226,140);}"
-        "QTabWidget#commandRibbon QToolButton {border:1px solid rgba(160,140,200,70);"
-        "border-radius:11px;padding:5px 8px;background:rgba(255,255,255,30);}"
-        "QTabWidget#commandRibbon QToolButton:hover {"
-        "background:rgba(125,103,224,100);border:1px solid rgba(125,103,224,170);}"
-        "QTabWidget#commandRibbon QToolButton:pressed {background:rgba(95,74,195,130);}"
-    );
+    ribbon->setMaximumHeight(79);
+    ribbon->setMinimumHeight(67);
     auto addRibbonCategory=[&](const QString &name,
                                const QVector<QPair<QString,QAction*>> &commands){
         auto page=new QWidget(ribbon);
         page->setObjectName("ribbonPage");
-        const QString tint=name=="Home"?"rgba(46,174,221,35)":
-            name=="Sequence"?"rgba(39,202,144,35)":
-            name=="Plasmid"?"rgba(231,120,177,38)":"rgba(166,115,244,38)";
-        page->setStyleSheet("QWidget#ribbonPage {background:"+tint+
-                            ";border-radius:11px;}");
         auto row=new QHBoxLayout(page);
-        row->setContentsMargins(8,4,8,4);
-        row->setSpacing(6);
+        row->setContentsMargins(4,2,4,2);
+        row->setSpacing(2);
         for(const auto &command:commands){
             if(!command.second)continue;
             auto button=new QToolButton(page);
             button->setText(command.first);
-            button->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
-            button->setIconSize(QSize(22,22));
-            button->setMinimumWidth(78);
-            button->setMaximumWidth(132);
+            button->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            button->setIconSize(QSize(15,15));
+            button->setMinimumWidth(56);
+            button->setMaximumWidth(126);
             button->setAutoRaise(true);
             button->setDefaultAction(command.second);
             button->setText(command.first);
@@ -698,12 +698,14 @@ Editor::Editor(bool preview):preview_(preview) {
     addRibbonCategory("Analysis",{{"MAFFT",mafftA},{"MUSCLE",muscleA},{"BLAST+",blastA},
                                   {"Consensus",consensusA},{"Matrix",matrixA},{"p-distance",distanceA},{"Statistics",statsA},{"PHYLIP",phyloA},{"Tool settings",configA}});
     layout->addWidget(ribbon);
-    auto strip=new QHBoxLayout;auto title=new QLabel("<b style='font-size:19px'>Your sequences, in focus.</b>");strip->addWidget(title);strip->addStretch();
+    auto strip=new QHBoxLayout;auto title=new QLabel("<b style='font-size:14px'>Workspace</b>");strip->addWidget(title);strip->addStretch();
     molecule_=new QComboBox;molecule_->addItems({"DNA","RNA","Protein"});molecule_->setToolTip("Verify molecule type; short proteins cannot always be inferred from letters.");strip->addWidget(molecule_);
-    search_=new QLineEdit;search_->setPlaceholderText("Find exact motif in active row…");search_->setMaximumWidth(245);strip->addWidget(search_);
+    search_=new QLineEdit;search_->setPlaceholderText("Find nucleotide or peptide motif…");search_->setMaximumWidth(260);strip->addWidget(search_);
     auto find=new QPushButton("Find next");strip->addWidget(find);layout->addLayout(strip);
     notice_=new QLabel;notice_->setWordWrap(true);notice_->setStyleSheet("background:#fff0d8;color:#86602b;border-radius:7px;padding:7px;");layout->addWidget(notice_);
-    auto split=new QSplitter;layout->addWidget(split,1);tabs_=new QTabWidget;split->addWidget(tabs_);
+    auto split=new QSplitter(Qt::Horizontal,root);layout->addWidget(split,1);
+    tabs_=new QTabWidget;tabs_->setObjectName("studioTabs");tabs_->setDocumentMode(true);
+    tabs_->setMovable(false);split->addWidget(tabs_);
     auto alignment=new QWidget;auto al=new QVBoxLayout(alignment);al->setContentsMargins(0,8,0,0);
     auto legend=new QLabel("   <b style='color:#199c73'>A</b> adenine   <b style='color:#408bd0'>C</b> cytosine   <b style='color:#b18527'>G</b> guanine   <b style='color:#cf6281'>T/U</b> thymine / uracil   ·   Double-click a residue to edit");legend->setObjectName("residueLegend");al->addWidget(legend);
     table=new QTableView;table->setObjectName("alignment");table->setModel(model);table->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
