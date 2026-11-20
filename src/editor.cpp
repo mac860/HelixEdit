@@ -1279,7 +1279,232 @@ void Editor::selectFeature(int idx){const auto &r=model->document.records[active
 void Editor::showAnalysis(const QString &title,const QString &text){QDialog d(this);d.setWindowTitle(title);auto l=new QVBoxLayout(&d);auto view=new QPlainTextEdit;view->setReadOnly(true);view->setPlainText(text);l->addWidget(view);auto b=new QDialogButtonBox(QDialogButtonBox::Close);l->addWidget(b);connect(b,&QDialogButtonBox::rejected,&d,&QDialog::reject);d.resize(650,400);d.exec();}
 void Editor::translateSelected(){if(model->document.alphabet=="Protein"){QMessageBox::information(this,"Translate","Select DNA or RNA first.");return;}bool ok=false;int frame=QInputDialog::getInt(this,"Translation","Frame (standard genetic code, complete codons only)",1,1,3,1,&ok);if(!ok)return;runSafely([&]{const auto &r=model->document.records[activeRow()];showAnalysis("Translation",">"+r.name+" frame "+QString::number(frame)+"\n"+translate(r.sequence,frame-1)+"\n\nStandard code. Ambiguous codons → X. Trailing partial codons omitted. Stops → *. Full active row, not selected columns.");});}
 void Editor::findNext(){QString motif=search_->text().trimmed().toUpper();if(motif.isEmpty())return;if(motif.contains(QRegularExpression("[^A-Z*?-]"))){statusBar()->showMessage("Search uses exact residue symbols; no regular expressions.");return;}int row=activeRow();const auto &s=model->document.records[row].sequence;int from=table->currentIndex().isValid()?table->currentIndex().column()+1:0;int at=s.indexOf(motif,from);if(at<0)at=s.indexOf(motif);if(at<0){statusBar()->showMessage("No exact match in active row. Search does not cross a circular origin.");return;}table->setCurrentIndex(model->index(row,at));QItemSelection sel(model->index(row,at),model->index(row,at+motif.size()-1));table->selectionModel()->select(sel,QItemSelectionModel::ClearAndSelect);table->scrollTo(model->index(row,at));tabs_->setCurrentIndex(0);statusBar()->showMessage("Exact match at alignment column "+QString::number(at+1));}
-void Editor::toolSettings(){QDialog d(this);d.setWindowTitle("Local package executables");auto l=new QFormLayout(&d);QSettings settings;QMap<QString,QLineEdit*> fields;for(const auto &key:QStringList{"mafft","muscle","blastn","blastp"}){auto field=new QLineEdit(settings.value("tools/"+key).toString());field->setPlaceholderText(QStandardPaths::findExecutable(key));fields[key]=field;l->addRow(key,field);}auto note=new QLabel("Blank = search PATH. Use an executable path, without flags.\nMAFFT 7 and MUSCLE 5 alignment adapters are implemented.\nBLAST+ local database search is available for nucleotide and protein sequences.\nOn Apple Silicon, Homebrew commonly installs in /opt/homebrew/bin.");note->setWordWrap(true);l->addRow(note);auto b=new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel);l->addRow(b);connect(b,&QDialogButtonBox::accepted,&d,&QDialog::accept);connect(b,&QDialogButtonBox::rejected,&d,&QDialog::reject);d.resize(560,270);if(d.exec()==QDialog::Accepted)for(auto it=fields.cbegin();it!=fields.cend();++it)settings.setValue("tools/"+it.key(),it.value()->text().trimmed());}
+void Editor::showSettings() {
+    QSettings stored("HelixEdit","HelixEdit");
+    QDialog dialog(this);
+    dialog.setObjectName("helixSettingsDialog");
+    dialog.setWindowTitle("HelixEdit · Settings");
+    dialog.resize(690,500);
+    auto main=new QVBoxLayout(&dialog);
+    main->setContentsMargins(14,14,14,12);
+    main->setSpacing(9);
+    auto header=new QLabel("<b style='font-size:17px'>Settings & preferences</b>"
+        "<br><span style='color:#8291a5'>Personalize the workspace, local tools and update source.</span>");
+    header->setWordWrap(true);
+    main->addWidget(header);
+    auto pages=new QTabWidget(&dialog);
+    pages->setObjectName("preferencesTabs");
+    main->addWidget(pages,1);
+
+    // Appearance: theme and initial working view.
+    auto appearancePage=new QWidget(pages);
+    auto appearanceLayout=new QVBoxLayout(appearancePage);
+    appearanceLayout->setContentsMargins(14,15,14,12);
+    auto appearanceForm=new QFormLayout;
+    appearanceForm->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+    auto theme=new QComboBox;
+    theme->setObjectName("themePreference");
+    theme->addItems({"Light","Dark","Dracula"});
+    theme->setCurrentText(savedTheme());
+    appearanceForm->addRow("Color theme",theme);
+    auto startPage=new QComboBox;
+    startPage->setObjectName("startupTabPreference");
+    startPage->addItems({"Map","Sequence"});
+    startPage->setCurrentText(stored.value("workspace/startTab","Map").toString());
+    appearanceForm->addRow("Default document view",startPage);
+    appearanceLayout->addLayout(appearanceForm);
+    auto themeNote=new QLabel("Themes apply to menus, editor panels, dialogs and the plasmid map. "
+        "Choose <b>Save settings</b> to apply your changes. "
+        "The startup view is used for newly opened sessions.");
+    themeNote->setWordWrap(true);
+    appearanceLayout->addWidget(themeNote);
+    appearanceLayout->addStretch();
+    pages->addTab(appearancePage,"Appearance");
+
+    // Map display and local autosave interval.
+    auto mapPage=new QWidget(pages);
+    auto mapLayout=new QVBoxLayout(mapPage);
+    mapLayout->setContentsMargins(14,15,14,12);
+    auto mapEnzymes=new QCheckBox("Show recognition-site labels on circular maps");
+    mapEnzymes->setObjectName("enzymeLabelsPreference");
+    mapEnzymes->setChecked(stored.value("map/showEnzymes",true).toBool());
+    auto mapFeatures=new QCheckBox("Display colored annotation arrows and labels");
+    mapFeatures->setObjectName("featureLabelsPreference");
+    mapFeatures->setChecked(stored.value("map/showFeatures",true).toBool());
+    mapLayout->addWidget(mapEnzymes);
+    mapLayout->addWidget(mapFeatures);
+    auto zoomForm=new QFormLayout;
+    auto zoomRow=new QWidget;
+    auto zoomLayout=new QHBoxLayout(zoomRow);
+    zoomLayout->setContentsMargins(0,0,0,0);
+    auto zoom=new QSlider(Qt::Horizontal);
+    zoom->setObjectName("defaultMapZoom");
+    zoom->setRange(65,135);
+    zoom->setSingleStep(5);
+    zoom->setPageStep(10);
+    zoom->setValue(stored.value("map/defaultZoom",100).toInt());
+    auto zoomValue=new QLabel(QString::number(zoom->value())+"%");
+    zoomValue->setMinimumWidth(44);
+    zoomLayout->addWidget(zoom,1);
+    zoomLayout->addWidget(zoomValue);
+    connect(zoom,&QSlider::valueChanged,&dialog,[zoomValue](int value){
+        zoomValue->setText(QString::number(value)+"%");
+    });
+    zoomForm->addRow("Map zoom",zoomRow);
+    auto autosave=new QComboBox;
+    autosave->setObjectName("autosavePreference");
+    for(const int seconds:{30,60,120,300})
+        autosave->addItem(QString::number(seconds)+" seconds",seconds);
+    const int chosenInterval=stored.value("editing/autosaveSeconds",30).toInt();
+    const int initialInterval=autosave->findData(chosenInterval);
+    autosave->setCurrentIndex(initialInterval>=0?initialInterval:0);
+    zoomForm->addRow("Automatic local save",autosave);
+    mapLayout->addLayout(zoomForm);
+    auto mapNote=new QLabel("Changes to a named .helix project are periodically saved. "
+        "An independent local recovery copy is retained. FASTA/GenBank originals are not overwritten. "
+        "Map visibility controls remain available for quick adjustments in the Map tab.");
+    mapNote->setWordWrap(true);
+    mapLayout->addWidget(mapNote);
+    mapLayout->addStretch();
+    pages->addTab(mapPage,"Map & editing");
+
+    // Executable paths are optional: empty means find each tool on PATH.
+    auto toolsPage=new QWidget(pages);
+    auto toolsLayout=new QVBoxLayout(toolsPage);
+    toolsLayout->setContentsMargins(14,15,14,12);
+    auto executables=new QFormLayout;
+    executables->setFieldGrowthPolicy(QFormLayout::ExpandingFieldsGrow);
+    QMap<QString,QLineEdit*> toolFields;
+    for(const auto &key:QStringList{"mafft","muscle","blastn","blastp","primer3_core"}) {
+        auto row=new QWidget(toolsPage);
+        auto horizontal=new QHBoxLayout(row);
+        horizontal->setContentsMargins(0,0,0,0);
+        horizontal->setSpacing(5);
+        auto input=new QLineEdit(row);
+        input->setObjectName("executable_"+key);
+        input->setText(stored.value("tools/"+key).toString());
+        const QString detected=QStandardPaths::findExecutable(key);
+        input->setPlaceholderText(detected.isEmpty()?"Search system PATH":detected);
+        auto browse=new QPushButton("Browse…",row);
+        horizontal->addWidget(input,1);
+        horizontal->addWidget(browse);
+        executables->addRow(key,row);
+        toolFields.insert(key,input);
+        connect(browse,&QPushButton::clicked,&dialog,[&dialog,input,key]{
+            const QString chosen=QFileDialog::getOpenFileName(&dialog,
+                "Choose "+key+" executable",input->text());
+            if(!chosen.isEmpty())input->setText(chosen);
+        });
+    }
+    toolsLayout->addLayout(executables);
+    auto toolsNote=new QLabel("Leave a field blank to use an installed executable on PATH. "
+        "Specify an absolute executable path without command-line arguments. "
+        "MAFFT, MUSCLE, BLAST+ and Primer3 are optional scientific packages; "
+        "HelixEdit does not install or bundle them.");
+    toolsNote->setWordWrap(true);
+    toolsLayout->addWidget(toolsNote);
+    toolsLayout->addStretch();
+    pages->addTab(toolsPage,"Scientific tools");
+
+    // Source-based upgrades are initiated by the user, never silently scheduled.
+    auto updatesPage=new QWidget(pages);
+    auto updatesLayout=new QVBoxLayout(updatesPage);
+    updatesLayout->setContentsMargins(14,15,14,12);
+    updatesLayout->addWidget(new QLabel("<b>GitHub source update</b>"));
+    auto sourceRow=new QHBoxLayout;
+    auto source=new QLineEdit;
+    source->setObjectName("updateSourcePreference");
+    source->setPlaceholderText("Existing cloned HelixEdit source folder");
+    source->setText(stored.value("updater/source").toString());
+    auto browseSource=new QPushButton("Browse…");
+    sourceRow->addWidget(source,1);
+    sourceRow->addWidget(browseSource);
+    updatesLayout->addLayout(sourceRow);
+    connect(browseSource,&QPushButton::clicked,&dialog,[&dialog,source]{
+        const QString folder=QFileDialog::getExistingDirectory(&dialog,
+            "Select existing HelixEdit Git repository",source->text());
+        if(!folder.isEmpty())source->setText(folder);
+    });
+    auto updateNote=new QLabel("Updates use the official "
+        "<a href='https://github.com/mac860/HelixEdit'>mac860/HelixEdit</a> "
+        "<b>main</b> branch. A clean existing Git checkout is required. "
+        "Source updates, builds, tests and package installation run only when requested. "
+        "No automatic background update checks or scheduled downloads are enabled.");
+    updateNote->setOpenExternalLinks(true);
+    updateNote->setWordWrap(true);
+    updatesLayout->addWidget(updateNote);
+    auto launchUpdater=new QPushButton("Open update assistant…");
+    updatesLayout->addWidget(launchUpdater,0,Qt::AlignLeft);
+    connect(launchUpdater,&QPushButton::clicked,&dialog,[this,&dialog]{
+        dialog.accept();
+        openSourceUpdater(this);
+    });
+    updatesLayout->addStretch();
+    pages->addTab(updatesPage,"Updates");
+
+    auto bottom=new QHBoxLayout;
+    auto reset=new QPushButton("Restore defaults");
+    reset->setObjectName("restoreSettingsDefaults");
+    bottom->addWidget(reset);
+    bottom->addStretch();
+    auto buttons=new QDialogButtonBox(QDialogButtonBox::Save|QDialogButtonBox::Cancel);
+    buttons->button(QDialogButtonBox::Save)->setText("Save settings");
+    bottom->addWidget(buttons);
+    main->addLayout(bottom);
+    connect(reset,&QPushButton::clicked,&dialog,[=]{
+        theme->setCurrentText("Dark");
+        startPage->setCurrentText("Map");
+        mapEnzymes->setChecked(true);
+        mapFeatures->setChecked(true);
+        zoom->setValue(100);
+        autosave->setCurrentIndex(0);
+        for(auto *field:toolFields)field->clear();
+        source->clear();
+    });
+    connect(buttons,&QDialogButtonBox::rejected,&dialog,&QDialog::reject);
+    connect(buttons,&QDialogButtonBox::accepted,&dialog,[&]{
+        for(auto it=toolFields.cbegin();it!=toolFields.cend();++it) {
+            const QString value=it.value()->text().trimmed();
+            if(!value.isEmpty() && (!QFileInfo(value).isAbsolute() ||
+                                     !QFileInfo(value).isExecutable())) {
+                QMessageBox::warning(&dialog,"Invalid executable path",
+                    "The path for "+it.key()+" must be a valid executable file. "
+                    "Clear the field to search your system PATH automatically.");
+                pages->setCurrentWidget(toolsPage);
+                it.value()->setFocus();
+                return;
+            }
+        }
+        const QString sourceFolder=source->text().trimmed();
+        if(!sourceFolder.isEmpty() &&
+           (!QFileInfo::exists(QDir(sourceFolder).filePath(".git")) ||
+            !QFileInfo::exists(QDir(sourceFolder).filePath("CMakeLists.txt")))) {
+            QMessageBox::warning(&dialog,"Invalid source folder",
+                "Select a HelixEdit Git checkout containing .git and CMakeLists.txt, "
+                "or clear the path to configure it later.");
+            pages->setCurrentWidget(updatesPage);
+            source->setFocus();
+            return;
+        }
+        QSettings settings("HelixEdit","HelixEdit");
+        settings.setValue("workspace/startTab",startPage->currentText());
+        settings.setValue("map/showEnzymes",mapEnzymes->isChecked());
+        settings.setValue("map/showFeatures",mapFeatures->isChecked());
+        settings.setValue("map/defaultZoom",zoom->value());
+        settings.setValue("editing/autosaveSeconds",autosave->currentData().toInt());
+        settings.setValue("updater/source",sourceFolder);
+        for(auto it=toolFields.cbegin();it!=toolFields.cend();++it)
+            settings.setValue("tools/"+it.key(),it.value()->text().trimmed());
+        applyTheme(theme->currentText());
+        if(mapEnzymeToggle_)mapEnzymeToggle_->setChecked(mapEnzymes->isChecked());
+        if(mapFeatureToggle_)mapFeatureToggle_->setChecked(mapFeatures->isChecked());
+        if(map_) {map_->setZoom(zoom->value()/100.0);map_->update();}
+        if(autosave_)autosave_->setInterval(autosave->currentData().toInt()*1000);
+        dialog.accept();
+        statusBar()->showMessage("Settings saved locally.");
+    });
+    dialog.exec();
+}
 void Editor::align(const QString &tool){
     if(busy()){QMessageBox::information(this,"Alignment running","One job at a time. The current document remains locked until it finishes.");return;}
     if(model->document.records.size()<2){QMessageBox::information(this,"Alignment","Add at least two sequences.");return;}
