@@ -4,6 +4,7 @@
 #include "restriction.h"
 #include "primer.h"
 #include "academic.h"
+#include "statistics.h"
 #include <QtSvg/QSvgGenerator>
 #include <QDesktopServices>
 #include <cmath>
@@ -318,6 +319,49 @@ Editor::Editor(bool preview):preview_(preview) {
             showAnalysis("Pairwise identity matrix",result);
         });
     });
+    analysis->addAction("Sequence statistics…",this,[this]{
+        const auto &d=model->document;
+        QString report="SEQUENCE STATISTICS\\n";
+        report+="Molecule type: "+d.alphabet+"\\nRecord count: "+QString::number(d.records.size())+
+                "\\nAlignment width: "+QString::number(width(d))+"\\n\\n";
+        for(const auto &r:d.records){
+            const auto x=sequenceStatistics(r,d.alphabet);
+            report+=QString("%1\\n  ungapped=%2  columns=%3  gaps=%4  ambiguous=%5  GC=%6\\n")
+                .arg(r.name).arg(x.ungappedLength).arg(x.alignmentLength)
+                .arg(x.gaps).arg(x.ambiguous)
+                .arg(x.gc<0?"NA":QString::number(x.gc,'f',2)+"%");
+        }
+        showAnalysis("Sequence statistics",report);
+    });
+    analysis->addAction("p-distance matrix…",this,[this]{
+        runSafely([&]{
+            const auto matrix=pDistanceMatrix(model->document);
+            QString report="Uncorrected p-distance: mismatches / compared non-gap, non-? columns.\\n"
+                           "Ambiguous symbols are compared literally. NA = no comparable columns.\\n\\n";
+            for(int i=0;i<matrix.size();++i){
+                report+=model->document.records[i].name+": ";
+                for(int j=0;j<matrix[i].size();++j)
+                    report+=(matrix[i][j]<0?"NA":QString::number(matrix[i][j],'f',5))+
+                            (j+1==matrix[i].size()?"":"  |  ");
+                report+="\\n";
+            }
+            showAnalysis("p-distance matrix",report);
+        });
+    });
+    analysis->addAction("Export PHYLIP for phylogenetics…",this,[this]{
+        const QString path=QFileDialog::getSaveFileName(this,"Export aligned PHYLIP",{},"PHYLIP (*.phy)");
+        if(path.isEmpty())return;
+        runSafely([&]{
+            const QByteArray bytes=phylipSequential(model->document).toUtf8();
+            const QString destination=path.endsWith(".phy",Qt::CaseInsensitive)?path:path+".phy";
+            QSaveFile file(destination);
+            if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit())
+                throw std::runtime_error("Could not export PHYLIP.");
+            QMessageBox::information(this,"PHYLIP export",
+                "Exported strict sequential PHYLIP with stable HX identifiers. "
+                "Sequence names and annotations are not included; retain your .helix project.");
+        });
+    });
     auto cloningMenu=menuBar()->addMenu("&Cloning");
     cloningMenu->addAction("Assemble selected fragments by exact overlap…",this,[this]{
         if(busy()||model->document.alphabet=="Protein")return;
@@ -443,6 +487,9 @@ Editor::Editor(bool preview):preview_(preview) {
     auto restrictA=actionFor(analysis,"Common restriction sites",QStyle::SP_FileDialogContentsView);
     auto assemblyA=actionFor(cloningMenu,"Assemble selected fragments by exact overlap…",QStyle::SP_FileDialogDetailedView);
     auto matrixA=actionFor(analysis,"Pairwise identity matrix…",QStyle::SP_FileDialogContentsView);
+    auto statsA=actionFor(analysis,"Sequence statistics…",QStyle::SP_FileDialogDetailedView);
+    auto distanceA=actionFor(analysis,"p-distance matrix…",QStyle::SP_FileDialogContentsView);
+    auto phyloA=actionFor(analysis,"Export PHYLIP for phylogenetics…",QStyle::SP_DialogSaveButton);
     auto mafftA=actionFor(tools,"Align with MAFFT",QStyle::SP_BrowserReload);
     auto muscleA=actionFor(tools,"Align with MUSCLE 5",QStyle::SP_BrowserReload);
     auto configA=actionFor(tools,"Configure executables…",QStyle::SP_FileDialogDetailedView);
@@ -457,7 +504,7 @@ Editor::Editor(bool preview):preview_(preview) {
     addRibbonCategory("Plasmid",{{"Addgene ID",addgeneA},{"Import GenBank",importA},
                                  {"Restriction",restrictA},{"Export GB",gbExportA},{"Assemble",assemblyA}});
     addRibbonCategory("Analysis",{{"MAFFT",mafftA},{"MUSCLE",muscleA},
-                                  {"Consensus",consensusA},{"Matrix",matrixA},{"ORFs",orfA},{"Tool settings",configA}});
+                                  {"Consensus",consensusA},{"Matrix",matrixA},{"p-distance",distanceA},{"Statistics",statsA},{"PHYLIP",phyloA},{"Tool settings",configA}});
     layout->addWidget(ribbon);
     auto strip=new QHBoxLayout;auto title=new QLabel("<b style='font-size:19px'>Your sequences, in focus.</b>");strip->addWidget(title);strip->addStretch();
     molecule_=new QComboBox;molecule_->addItems({"DNA","RNA","Protein"});molecule_->setToolTip("Verify molecule type; short proteins cannot always be inferred from letters.");strip->addWidget(molecule_);
