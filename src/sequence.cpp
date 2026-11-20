@@ -32,8 +32,10 @@ static void infer(Document &d) {
 }
 Document parseFasta(const QString &text) {
     Document d;
-    for(QString line:text.split('\n')) {
-        line=line.trimmed(); if(line.isEmpty() || line.startsWith(';')) continue;
+    QString normalized=text;
+    if(normalized.startsWith(QChar(0xFEFF)))normalized.remove(0,1);
+    for(QString line:normalized.split('\n')) {
+        line=line.trimmed(); if(line.isEmpty() || line.startsWith(';') || line.startsWith('#')) continue;
         if(line.startsWith('>')) { d.records.append(Record{line.mid(1).trimmed(),{},{},false}); }
         else { if(d.records.isEmpty()) fail("FASTA data must begin with >name."); d.records.last().sequence+=line; }
     }
@@ -74,7 +76,24 @@ QString clustal(const Document &d) {
 }
 Document parseGenBank(const QString &text) {
     Document d;
-    for(const auto &block:text.split("//")) {
+    QString normalized=text;
+    if(normalized.startsWith(QChar(0xFEFF)))normalized.remove(0,1);
+    // Only a standalone GenBank record terminator (// at column 1) splits
+    // records. Splitting on arbitrary // incorrectly breaks COMMENT URLs
+    // such as https://www.snapgene.com before reaching ORIGIN.
+    QStringList blocks;
+    QString pending;
+    for(const QString &line:normalized.split('\n')) {
+        if(line.startsWith("//") && line.mid(2).trimmed().isEmpty()) {
+            if(!pending.trimmed().isEmpty())blocks.append(pending);
+            pending.clear();
+        } else {
+            pending+=line;
+            pending+='\n';
+        }
+    }
+    if(!pending.trimmed().isEmpty())blocks.append(pending);
+    for(const auto &block:blocks) {
         if(block.trimmed().isEmpty()) continue;
         Record r; bool origin=false,features=false; int active=-1, declared=-1;
         for(QString line:block.split('\n')) {
@@ -98,8 +117,12 @@ Document parseGenBank(const QString &text) {
                 }
             }
         }
+        if(!origin || r.sequence.trimmed().isEmpty())
+            fail("GenBank record has no ORIGIN nucleotide sequence. Open the complete .gb/.gbk file, not a feature-only excerpt.");
         r.sequence=validateSequence(r.sequence);
-        if(r.name.isEmpty() || declared!=r.sequence.size()) fail("GenBank sequence length does not match LOCUS.");
+        if(r.name.isEmpty() || declared!=r.sequence.size())
+            fail(QString("GenBank LOCUS length mismatch: declared %1 bp but ORIGIN contains %2 bp.")
+                .arg(declared).arg(r.sequence.size()));
         d.records.append(r);
     }
     d.warnings << "GenBank import keeps sequence, topology and simple feature intervals only. Complex locations and other metadata are not preserved. Keep the original file.";
@@ -158,6 +181,7 @@ Document readDocument(const QString &path) {
     QFile file(path); if(!file.open(QIODevice::ReadOnly)) fail(file.errorString());
     if(file.size()>128*1024*1024) fail("This preview limits imported files to 128 MiB.");
     QString text=QString::fromUtf8(file.readAll());
+    if(text.startsWith(QChar(0xFEFF)))text.remove(0,1); // UTF-8 BOM
     if(text.trimmed().startsWith('{')) {
         QJsonParseError e; auto j=QJsonDocument::fromJson(text.toUtf8(),&e).object();
         if(e.error!=QJsonParseError::NoError || j["format"]!="HelixEdit" || j["version"].toInt()!=1) fail("Unsupported HelixEdit project.");
