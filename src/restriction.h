@@ -8,16 +8,11 @@ struct RestrictionSite {
  int end=0;   // zero-based recognition end, may exceed molecule length for circular wrap
  bool reverse=false;
 };
-inline QVector<RestrictionSite> findRestrictionSites(const Record &record) {
- QVector<RestrictionSite> result;
- QString seq=ungapped(record.sequence).toUpper();
- seq.replace('U','T');
- const int n=seq.size();
- if(n==0)return result;
+inline const QVector<QPair<QString,QString>>& restrictionMotifs() {
  // A focused set of exact, nondegenerate PALINDROMIC recognition motifs.
  // Recognition starts are reported, not cleavage coordinates. No methylation
  // or buffer compatibility is inferred. See NEB specificity catalog.
- const QVector<QPair<QString,QString>> motifs={
+ static const QVector<QPair<QString,QString>> motifs={
   {"AatII","GACGTC"},{"ApaI","GGGCCC"},{"BamHI","GGATCC"},
   {"BglII","AGATCT"},{"ClaI","ATCGAT"},{"EcoRI","GAATTC"},
   {"HindIII","AAGCTT"},{"HpaI","GTTAAC"},{"KpnI","GGTACC"},
@@ -28,6 +23,15 @@ inline QVector<RestrictionSite> findRestrictionSites(const Record &record) {
   {"SpeI","ACTAGT"},{"SphI","GCATGC"},{"SwaI","ATTTAAAT"},
   {"XbaI","TCTAGA"},{"XhoI","CTCGAG"}
  };
+ return motifs;
+}
+inline QVector<RestrictionSite> findRestrictionSites(const Record &record) {
+ QVector<RestrictionSite> result;
+ QString seq=ungapped(record.sequence).toUpper();
+ seq.replace('U','T');
+ const int n=seq.size();
+ if(n==0)return result;
+ const auto &motifs=restrictionMotifs();
  for(const auto &entry:motifs) {
   const QString motif=entry.second;
   if(motif.size()>n)continue;
