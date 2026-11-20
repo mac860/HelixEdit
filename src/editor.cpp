@@ -57,45 +57,149 @@ void AlignmentModel::replace(const Document &d) {beginResetModel();document=d;co
 static QColor featureColor(int i) { static const QStringList c={"#7c5ce7","#16a590","#f39c52","#e46d97","#408bd0"};return QColor(c[i%c.size()]); }
 void MapView::paintEvent(QPaintEvent *) {QPainter p(this);draw(p,rect());}
 void MapView::draw(QPainter &p,const QRectF &bounds) const {
-    p.save(); p.setRenderHint(QPainter::Antialiasing);p.fillRect(bounds,QColor("#ffffff"));
-    QString seq=ungapped(record.sequence); const int n=seq.size();
-    if(!n) {p.drawText(bounds,Qt::AlignCenter,"Open a sequence to view its map");p.restore();return;}
-    p.setPen(QColor("#29283c"));
+    p.save();
+    p.setRenderHint(QPainter::Antialiasing,true);
+    const QString theme=savedTheme();
+    const bool dark=isDarkTheme(theme);
+    const QColor bg(theme=="Dracula"?"#21222c":(dark?"#131820":"#ffffff"));
+    const QColor foreground(dark?"#eef3fa":"#243247");
+    const QColor muted(dark?"#97a7bb":"#72839a");
+    const QColor line(dark?"#607088":"#a0b1c7");
+    p.fillRect(bounds,bg);
+    const QString seq=ungapped(record.sequence);
+    const int n=int(seq.size());
+    if(!n) {
+        p.setPen(muted);
+        p.drawText(bounds,Qt::AlignCenter,"Open a DNA or protein sequence to see its map");
+        p.restore();return;
+    }
     if(!record.circular || alphabet=="Protein") {
-        const qreal x=bounds.left()+45,y=bounds.center().y()-25,w=bounds.width()-90;
-        p.setPen(QPen(QColor("#d7d3e6"),6));p.drawLine(QPointF(x,y),QPointF(x+w,y));
-        p.setPen(QColor("#6d6682"));p.drawText(QRectF(x,y-50,w,28),Qt::AlignCenter,"LINEAR  /  "+QString::number(n)+(alphabet=="Protein"?" aa":" bp"));
-        for(int j=0;j<=4;++j) {qreal xx=x+w*j/4.;p.drawLine(QPointF(xx,y-6),QPointF(xx,y+6));p.drawText(QRectF(xx-30,y+12,60,20),Qt::AlignCenter,QString::number(j?int(n*j/4.):1));}
+        const qreal x=bounds.left()+55,y=bounds.center().y()-20,w=qMax<qreal>(50,bounds.width()-110);
+        p.setPen(QPen(line,7,Qt::SolidLine,Qt::RoundCap));
+        p.drawLine(QPointF(x,y),QPointF(x+w,y));
+        p.setPen(foreground);
+        p.drawText(QRectF(x,y-62,w,30),Qt::AlignCenter,
+            record.name+"  ·  "+QLocale().toString(n)+(alphabet=="Protein"?" aa":" bp")+"  ·  LINEAR");
+        for(int j=0;j<=5;++j) {
+            const qreal xx=x+w*j/5.;
+            p.setPen(QPen(line,1));p.drawLine(QPointF(xx,y-9),QPointF(xx,y+9));
+            p.setPen(muted);p.drawText(QRectF(xx-38,y+15,76,20),Qt::AlignCenter,
+                QString::number(j?int(n*j/5.):1));
+        }
+        if(showFeatures)for(int i=0;i<record.features.size();++i) {
+            const auto &f=record.features[i];
+            const qreal left=x+w*f.start/n,right=x+w*f.end/n, yy=y+56+(i%4)*29;
+            if(right<=left)continue;
+            const QColor color=featureColor(i);
+            const qreal tip=qMin<qreal>(9,(right-left)*.4);
+            QPolygonF polygon;
+            if(f.reverse)polygon<<QPointF(right,yy-7)<<QPointF(left+tip,yy-7)
+                <<QPointF(left,yy)<<QPointF(left+tip,yy+7)<<QPointF(right,yy+7);
+            else polygon<<QPointF(left,yy-7)<<QPointF(right-tip,yy-7)
+                <<QPointF(right,yy)<<QPointF(right-tip,yy+7)<<QPointF(left,yy+7);
+            p.setPen(Qt::NoPen);p.setBrush(color);p.drawPolygon(polygon);
+            p.setPen(foreground);
+            p.drawText(QRectF(left,yy+8,qMax<qreal>(70,right-left),17),Qt::AlignLeft,
+                f.name.left(22));
+        }
+        p.setBrush(Qt::NoBrush);p.restore();return;
+    }
+    const QPointF center=bounds.center();
+    const qreal radius=qMax<qreal>(64,qMin(bounds.width()*.245,bounds.height()*.29)*zoom);
+    const QRectF ring(center.x()-radius,center.y()-radius,radius*2,radius*2);
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QPen(dark?QColor("#56667b"):QColor("#b4c2d5"),13));
+    p.drawEllipse(ring);
+    p.setPen(QPen(bg,5));p.drawEllipse(ring);
+    p.setPen(QPen(line,1));p.drawEllipse(ring.adjusted(-9,-9,9,9));
+    p.drawEllipse(ring.adjusted(9,9,-9,-9));
+    for(int j=0;j<8;++j) {
+        const qreal angle=j*2*M_PI/8-M_PI/2;
+        const QPointF unit(std::cos(angle),std::sin(angle));
+        p.setPen(QPen(line,1));
+        p.drawLine(center+unit*(radius-8),center+unit*(radius+8));
+        p.setPen(muted);
+        const QPointF label=center+unit*(radius+24);
+        p.drawText(QRectF(label.x()-25,label.y()-10,50,20),Qt::AlignCenter,
+            QString::number(j?int(n*j/8.):1));
+    }
+    if(showFeatures) {
         for(int i=0;i<record.features.size();++i) {
-            const auto &f=record.features[i];qreal left=x+w*f.start/n,right=x+w*f.end/n, yy=y+55+(i%3)*29;
-            p.setPen(Qt::NoPen);p.setBrush(featureColor(i));
-            QPolygonF arrow; qreal head=qMin(8.,(right-left)/2);
-            if(f.reverse) arrow<<QPointF(right,yy-7)<<QPointF(left+head,yy-7)<<QPointF(left,yy)<<QPointF(left+head,yy+7)<<QPointF(right,yy+7);
-            else arrow<<QPointF(left,yy-7)<<QPointF(right-head,yy-7)<<QPointF(right,yy)<<QPointF(right-head,yy+7)<<QPointF(left,yy+7);
-            p.drawPolygon(arrow);
+            const auto &f=record.features[i];
+            if(f.end<=f.start)continue;
+            const QColor color=featureColor(i);
+            const double a=90.-360.*f.start/n;
+            const double span=-360.*(f.end-f.start)/n;
+            p.setPen(QPen(color,15,Qt::SolidLine,Qt::FlatCap));
+            p.drawArc(ring,int(a*16),int(span*16));
+            const double theta=(f.reverse?f.start:f.end)*2*M_PI/n-M_PI/2;
+            const QPointF radial(std::cos(theta),std::sin(theta));
+            QPointF tangent(-std::sin(theta),std::cos(theta));
+            if(f.reverse)tangent=-tangent;
+            const QPointF end=center+radial*radius;
+            p.setPen(Qt::NoPen);p.setBrush(color);
+            p.drawPolygon(QPolygonF{end+tangent*9,
+                end-tangent*6+radial*9,end-tangent*6-radial*9});
+            const qreal mid=(f.start+f.end)*M_PI/n-M_PI/2;
+            const QPointF midpoint=center+QPointF(std::cos(mid),std::sin(mid))*(radius-36);
+            QFont labelFont=p.font();labelFont.setPointSize(9);labelFont.setBold(true);
+            p.setFont(labelFont);p.setPen(dark?QColor("#f2f2fb"):QColor("#2b3545"));
+            const qreal width=qMax<qreal>(48,qMin<qreal>(140,f.name.size()*7+12));
+            p.drawText(QRectF(midpoint.x()-width/2,midpoint.y()-10,width,20),
+                Qt::AlignCenter,f.name.left(19));
         }
-    } else {
-        QPointF center(bounds.center().x(),bounds.center().y()-4);qreal radius=qMin(bounds.width(),bounds.height())*.30;
-        QRectF ring(center.x()-radius,center.y()-radius,radius*2,radius*2);
-        p.setPen(QPen(QColor("#edeaf6"),16));p.drawEllipse(ring);
-        for(int j=0;j<12;++j) {
-            double angle=j*2*M_PI/12-M_PI/2;QPointF unit(std::cos(angle),std::sin(angle));
-            p.setPen(QPen(QColor("#bcb5d2"),1));p.drawLine(center+unit*(radius+16),center+unit*(radius+23));
-            p.setPen(QColor("#77708b"));QPointF pos=center+unit*(radius+39);p.drawText(QRectF(pos.x()-28,pos.y()-10,56,20),Qt::AlignCenter,QString::number(int(n*j/12.)+1));
+    }
+    QFont centerFont=p.font();centerFont.setPointSize(14);centerFont.setBold(true);
+    p.setFont(centerFont);p.setPen(foreground);
+    p.drawText(QRectF(center.x()-110,center.y()-35,220,30),
+        Qt::AlignCenter,record.name.left(26));
+    centerFont.setPointSize(10);centerFont.setBold(false);
+    p.setFont(centerFont);p.setPen(muted);
+    p.drawText(QRectF(center.x()-110,center.y()+4,220,25),Qt::AlignCenter,
+        QLocale().toString(n)+" bp  ·  CIRCULAR");
+    if(showEnzymes && alphabet!="Protein") {
+        struct Callout { QString title; QPointF anchor; bool right; };
+        QVector<Callout> left,right;
+        const auto sites=findRestrictionSites(record);
+        constexpr int maxLabels=24;
+        for(int i=0;i<sites.size() && i<maxLabels;++i) {
+            const auto &site=sites[i];
+            const qreal theta=site.start*2*M_PI/n-M_PI/2;
+            const QPointF radial(std::cos(theta),std::sin(theta));
+            const QPointF anchor=center+radial*(radius+10);
+            const QString title=site.enzyme+"  ("+QString::number(site.start+1)+")";
+            (radial.x()>=0?right:left).append({title,anchor,radial.x()>=0});
         }
-        for(int i=0;i<record.features.size();++i) {
-            const auto &f=record.features[i];auto color=featureColor(i);
-            double a=90.-360.*f.start/n,span=-360.*(f.end-f.start)/n;
-            p.setPen(QPen(color,15,Qt::SolidLine,Qt::FlatCap));p.drawArc(ring,int(a*16),int(span*16));
-            double tip=(f.reverse?f.start:f.end)*2*M_PI/n-M_PI/2;
-            QPointF unit(std::cos(tip),std::sin(tip)), tangent(-std::sin(tip),std::cos(tip));if(f.reverse)tangent=-tangent;
-            QPointF pt=center+unit*radius;p.setPen(Qt::NoPen);p.setBrush(color);
-            p.drawPolygon(QPolygonF{pt+tangent*7,pt-tangent*5+unit*10,pt-tangent*5-unit*10});
+        QFont labelFont=p.font();labelFont.setPointSize(9);p.setFont(labelFont);
+        const QFontMetrics metrics(labelFont);
+        auto paintLabels=[&](QVector<Callout> &labels,bool rightSide) {
+            std::sort(labels.begin(),labels.end(),[](const Callout &a,const Callout &b){
+                return a.anchor.y()<b.anchor.y();
+            });
+            const qreal x=center.x()+(rightSide?radius+41:-radius-41);
+            qreal previous=bounds.top()+14;
+            for(const auto &label:labels) {
+                const qreal y=qMax(previous,label.anchor.y());
+                if(y>bounds.bottom()-14)break;
+                const int tw=metrics.horizontalAdvance(label.title)+8;
+                const qreal textX=rightSide?x+5:x-tw-5;
+                p.setPen(QPen(dark?QColor("#718095"):QColor("#8796ac"),1));
+                p.drawLine(label.anchor,QPointF(x,y));
+                p.setPen(QPen(dark?QColor("#62d5c1"):QColor("#356fe4"),2));
+                p.drawPoint(label.anchor);
+                p.setPen(foreground);
+                p.drawText(QRectF(textX,y-10,tw,20),
+                    rightSide?Qt::AlignLeft:Qt::AlignRight,label.title);
+                previous=y+17;
+            }
+        };
+        paintLabels(left,false);paintLabels(right,true);
+        if(sites.size()>maxLabels) {
+            p.setPen(muted);
+            p.drawText(QRectF(bounds.left()+12,bounds.bottom()-31,bounds.width()-24,20),
+                Qt::AlignLeft,"Showing first 24 recognition sites of "+QString::number(sites.size())+
+                "; open Enzymes for the complete list");
         }
-        QFont font=p.font();font.setPointSize(22);font.setBold(true);p.setFont(font);p.setPen(QColor("#332958"));
-        p.drawText(QRectF(center.x()-90,center.y()-35,180,40),Qt::AlignCenter,QLocale().toString(n));
-        font.setPointSize(10);font.setBold(false);p.setFont(font);p.setPen(QColor("#77708b"));
-        p.drawText(QRectF(center.x()-90,center.y()+4,180,40),Qt::AlignCenter,"bp  /  CIRCULAR");
     }
     p.restore();
 }
