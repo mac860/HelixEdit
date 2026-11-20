@@ -1,5 +1,6 @@
 #include "editor.h"
 #include "themes.h"
+#include "orf.h"
 #include <QtSvg/QSvgGenerator>
 #include <QDesktopServices>
 #include <cmath>
@@ -147,6 +148,28 @@ Editor::Editor(bool preview):preview_(preview) {
     edit->addAction("Reverse complement selected rows",this,&Editor::reverseSelected);
     auto analysis=menuBar()->addMenu("&Analysis");
     analysis->addAction("Translate active sequence…",this,&Editor::translateSelected);
+    analysis->addAction("Find open reading frames…",this,[this]{
+        if(model->document.alphabet=="Protein"){
+            QMessageBox::information(this,"ORF discovery","Select a DNA or RNA project first.");
+            return;
+        }
+        bool ok=false;
+        const int minimum=QInputDialog::getInt(this,"Find ORFs","Minimum amino acids",30,0,100000,1,&ok);
+        if(!ok)return;
+        runSafely([&]{
+            const auto &record=model->document.records[activeRow()];
+            const auto orfs=findOrfs(record.sequence,minimum);
+            QString report="Sequence: "+record.name+"\\nCoordinates: 1-based inclusive, forward reference\\nComplete ATG-start ORFs only\\n\\n";
+            if(orfs.isEmpty())report+="No matching ORFs found.";
+            for(const auto &orf:orfs) {
+                report+=QString("Frame %1  |  %2–%3  |  %4 aa\\n%5\\n\\n")
+                    .arg(orf.frame).arg(orf.start+1).arg(orf.end)
+                    .arg(orf.protein.size()).arg(orf.protein);
+            }
+            showAnalysis("Open reading frames",report);
+        });
+    });
+
     analysis->addAction("Consensus",this,[this]{showAnalysis("Consensus",">majority_consensus\n"+consensus(model->document)+"\n\nGaps excluded. Ties → N (DNA/RNA), X (protein). No frequency threshold.");});
     analysis->addAction("Pairwise identity (first two selected rows)",this,[this]{
         runSafely([&]{QSet<int> rows;for(const auto &range:table->selectionModel()->selection())for(int r=range.top();r<=range.bottom();++r)rows.insert(r);auto sorted=rows.values();std::sort(sorted.begin(),sorted.end());
