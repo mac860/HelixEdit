@@ -22,6 +22,14 @@ HelixEdit is being developed around three connected, offline-first workspaces. T
 
 The full [scientific development roadmap](ROADMAP.md) defines user workflows, acceptance criteria, testing requirements and staged releases. Existing alignment and map functionality remains available; advanced ORF, cloning, BLAST UI and phylogenetics features are not yet shipped.
 
+## Academic workflow development — current main branch
+
+Recent source commits add **annotated GenBank export** (simple interval features, nucleotide sequence and topology), an **aligned pairwise identity matrix**, and **exact-overlap two-fragment assembly previews** with optional circularization. They are exposed through File/Cloning/Analysis menus and the Plasmid/Analysis ribbon. A new `academic_workflows` Qt test target covers representative cases.
+
+**Important:** These commits are not yet verified on all target platforms; they should not be treated as a published release or a validated molecular-cloning simulator. GenBank export deliberately handles only simple feature locations and does not preserve arbitrary GenBank metadata. Exact overlap is not a prediction of Gibson, Golden Gate, ligation, PCR or transformation success. The matrix compares aligned columns and excludes gap-containing pairs.
+
+**Licensing:** HelixEdit contains independent implementation code, not copied proprietary SnapGene code or unverified BioEdit code. Feature parity is a development objective, not a current claim.
+
 ## Available now
 
 - Pastel nucleotide colours and grouped amino-acid colours, compact workspace, alignment/map/tools tabs.
