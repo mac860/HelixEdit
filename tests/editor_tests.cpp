@@ -13,6 +13,45 @@ private slots:
         editor.exportMap(tmp.filePath("map.svg"));QFile svg(tmp.filePath("map.svg"));QVERIFY(svg.open(QIODevice::ReadOnly));QVERIFY(svg.readAll().contains("<svg"));
         editor.loadPath(tmp.filePath("edited.helix"));QCOMPARE(editor.model->document.records[0].sequence[0],QChar('C'));
     }
+    void bundledExamplesAreAccessibleAndBounded() {
+        struct Spec {QString file;QString alphabet;int count;};
+        const QVector<Spec> specs={
+            {":/examples/samples/dna_orchid_6.fasta","DNA",6},
+            {":/examples/samples/rna_transcripts_3.fasta","RNA",3},
+            {":/examples/samples/proteins_5.fasta","Protein",5}
+        };
+        Editor editor(true);
+        auto menu=editor.findChild<QMenu*>("exampleMenu");
+        QVERIFY(menu);
+        QCOMPARE(int(menu->actions().size()),int(specs.size()));
+        for(int i=0;i<specs.size();++i){
+            QFile resource(specs[i].file);
+            QVERIFY2(resource.open(QIODevice::ReadOnly),qPrintable(specs[i].file));
+            auto doc=parseFasta(QString::fromUtf8(resource.readAll()));
+            doc.alphabet=specs[i].alphabet;
+            validateDocument(doc);
+            QCOMPARE(int(doc.records.size()),specs[i].count);
+            for(const auto &record:doc.records){
+                QVERIFY(ungapped(record.sequence).size()>0);
+                QVERIFY2(ungapped(record.sequence).size()<=400,qPrintable(record.name));
+                if(doc.alphabet=="RNA") {
+                    QVERIFY(record.sequence.contains('U'));
+                    QVERIFY(!record.sequence.contains('T'));
+                }
+            }
+            menu->actions().at(i)->trigger();
+            QCOMPARE(editor.model->document.alphabet,specs[i].alphabet);
+            QCOMPARE(int(editor.model->document.records.size()),specs[i].count);
+            QCOMPARE(editor.currentPath(),QString());
+        }
+    }
+    void updaterEntryIsAvailable() {
+        Editor editor(true);
+        bool found=false;
+        for(const auto *action:editor.findChildren<QAction*>())
+            found |= action->text().contains("update from GitHub source",Qt::CaseInsensitive);
+        QVERIFY(found);
+    }
     void compactWorkspaceAndNavigator() {
         Editor editor(true);
         auto studio=editor.findChild<QTabWidget*>("studioTabs");
