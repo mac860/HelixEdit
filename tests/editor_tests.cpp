@@ -1,4 +1,5 @@
 #include "editor.h"
+#include "themes.h"
 #include <QtTest>
 using namespace helix;
 class EditorTests:public QObject {
