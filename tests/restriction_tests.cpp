@@ -41,7 +41,10 @@ private slots:
   QVERIFY(has("NheI",2));
   QVERIFY(has("KpnI",11));
   QVERIFY(has("MluI",17));
-  r.sequence.replace(2,6,"CTAGCA");
+  // Mutate a base inside the NheI site rather than shifting the site one
+  // position left. Replacing GCTAGC with CTAGCA unintentionally forms
+  // GCTAGC starting one base earlier in this particular sequence.
+  r.sequence[2]='A';
   const auto mutated=findRestrictionSites(r);
   QVERIFY(std::none_of(mutated.begin(),mutated.end(),[](const RestrictionSite &site){
    return site.enzyme=="NheI";
