@@ -30,6 +30,18 @@ Recent source commits add **annotated GenBank export** (simple interval features
 
 **Licensing:** HelixEdit contains independent implementation code, not copied proprietary SnapGene code or unverified BioEdit code. Feature parity is a development objective, not a current claim.
 
+## Analysis Studio integration update (main; build verification pending)
+
+- **Multiple sequence alignment:** MAFFT and MUSCLE 5 already support DNA and protein projects with two or more records, preserving original identifiers and annotations on validated output.
+- **BLAST+:** local `blastn` and `blastp` queries against an existing `makeblastdb` database. Select a local database prefix; HelixEdit never sends queries to an online BLAST service. The first implementation is a 60-second synchronous preview and may temporarily block the UI. Database indexing and remote BLAST are not implemented.
+- **Statistics:** alignment length, ungapped length, gap count, ambiguity count and nucleotide GC%.
+- **Distance:** uncorrected pairwise p-distance matrix (no evolutionary correction; ambiguous letters are compared literally) and the previously added aligned identity matrix.
+- **Phylogenetic interoperability:** strict sequential PHYLIP export with stable generated identifiers; no tree inference or bootstrap support yet. Keep the .helix project to preserve original labels.
+- **Reproducibility:** alignment and BLAST+ jobs append UTC timestamps, executable/arguments, query SHA256 and output to a local `analysis-history.log`. Access it through Tools → View reproducible analysis history. The history is local and not tamper-evident; it is not a formal provenance system.
+- **CI:** Ubuntu x86_64, Ubuntu ARM64 and macOS Apple Silicon workflows now install BLAST+ and run `scripts/integration_smoke.sh` for MAFFT, MUSCLE 5 and local nucleotide BLAST+. The new tests must pass before describing these integrations as verified.
+
+**Branch audit:** Both `feature/sequence-studio-improvements` and `feature/0.1.1-themes` are already ancestors of `main` (ahead by zero commits); no merge was required and merging stale copies would risk reverting newer changes.
+
 ## Available now
 
 - Pastel nucleotide colours and grouped amino-acid colours, compact workspace, alignment/map/tools tabs.
