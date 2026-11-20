@@ -271,6 +271,52 @@ Editor::Editor(bool preview):preview_(preview) {
     }actions->addStretch();al->addLayout(actions);tabs_->addTab(alignment,"01  Alignment");
     auto mapPage=new QWidget;auto ml=new QVBoxLayout(mapPage);mapTitle_=new QLabel;mapTitle_->setStyleSheet("font-size:16px;font-weight:bold;padding:12px;");ml->addWidget(mapTitle_);
     map_=new MapView;ml->addWidget(map_,1);
+    auto primer3Button=new QPushButton("Design with Primer3");
+    connect(primer3Button,&QPushButton::clicked,this,[this]{
+        if(model->document.alphabet=="Protein"){
+            QMessageBox::information(this,"Primer3","Primer3 requires a nucleotide template.");return;
+        }
+        const QString executable=QStandardPaths::findExecutable("primer3_core");
+        if(executable.isEmpty()){
+            QMessageBox::information(this,"Primer3 not installed",
+                "Install the current Primer3 command-line package (primer3_core) and add it to PATH. "
+                "HelixEdit does not bundle Primer3 or substitute its thermodynamic algorithms.");
+            return;
+        }
+        const auto &record=model->document.records[activeRow()];
+        QString sequence=ungapped(record.sequence).toUpper();sequence.replace('U','T');
+        if(sequence.size()<60||sequence.contains(QRegularExpression("[^ACGT]"))){
+            QMessageBox::information(this,"Primer3 input","Select a DNA template of at least 60 unambiguous bases.");return;
+        }
+        QTemporaryDir dir;
+        if(!dir.isValid()){QMessageBox::warning(this,"Primer3","Unable to create temporary directory.");return;}
+        const QString inputPath=dir.filePath("primer3_input.txt");
+        QFile input(inputPath);
+        if(!input.open(QIODevice::WriteOnly)){QMessageBox::warning(this,"Primer3","Cannot create input file.");return;}
+        const QByteArray payload=("SEQUENCE_ID=HelixEdit_template\\nSEQUENCE_TEMPLATE="+sequence+
+            "\\nPRIMER_TASK=generic\\nPRIMER_PICK_LEFT_PRIMER=1\\nPRIMER_PICK_RIGHT_PRIMER=1\\n"
+            "PRIMER_NUM_RETURN=5\\nPRIMER_PRODUCT_SIZE_RANGE=100-1000\\n=\\n").toUtf8();
+        input.write(payload);input.close();
+        QProcess process;
+        process.setProgram(executable);
+        process.setArguments({inputPath});
+        process.setWorkingDirectory(dir.path());
+        process.start();
+        if(!process.waitForStarted(3000)){
+            QMessageBox::warning(this,"Primer3","Could not start primer3_core.");return;
+        }
+        if(!process.waitForFinished(30000)){
+            process.kill();process.waitForFinished();
+            QMessageBox::warning(this,"Primer3","Primer3 timed out after 30 seconds.");return;
+        }
+        const QString result=QString::fromUtf8(process.readAllStandardOutput());
+        const QString errors=QString::fromUtf8(process.readAllStandardError());
+        if(process.exitStatus()!=QProcess::NormalExit||process.exitCode()!=0){
+            QMessageBox::warning(this,"Primer3 failed",errors.left(2000));return;
+        }
+        showAnalysis("Primer3 design output",result+"\\n"+errors+
+            "\\nReview primer specificity and thermodynamics independently before experimental use.");
+    });
     auto primerButton=new QPushButton("Primer library");
     connect(primerButton,&QPushButton::clicked,this,[this]{
         if(model->document.alphabet=="Protein"){
@@ -322,6 +368,7 @@ Editor::Editor(bool preview):preview_(preview) {
     });
     auto mapButtons=new QHBoxLayout;
     mapButtons->addWidget(primerButton);
+    mapButtons->addWidget(primer3Button);
     auto restrictionButton=new QPushButton("Restriction sites");
     mapButtons->addWidget(restrictionButton);
     connect(restrictionButton,&QPushButton::clicked,this,[this]{
