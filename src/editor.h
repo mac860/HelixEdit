@@ -62,6 +62,8 @@ private:
     QListWidget *enzymeList_=nullptr;
     QTreeWidget *annotationTable_=nullptr;
     QComboBox *molecule_;
+    QCheckBox *mapEnzymeToggle_=nullptr;
+    QCheckBox *mapFeatureToggle_=nullptr;
     QLineEdit *search_;
     QPlainTextEdit *log_;
     QProcess *process_=nullptr;
@@ -79,7 +81,7 @@ private:
     void addFeature();
     void translateSelected();
     void findNext();
-    void toolSettings();
+    void showSettings();
     void align(const QString &tool);
     void cancelAlignment();
     void showAnalysis(const QString &title,const QString &text);
