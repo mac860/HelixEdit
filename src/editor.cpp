@@ -690,6 +690,9 @@ Editor::Editor(bool preview):preview_(preview) {
     bar->addWidget(spacer);
     auto offline=new QLabel("<b style='color:#35ae98'>● LOCAL</b>   <span style='color:#8d9bac'>BETA</span>  ");
     bar->addWidget(offline);
+    auto quickSettings=bar->addAction("Settings",this,&Editor::showSettings);
+    quickSettings->setToolTip("All HelixEdit preferences · Ctrl+,");
+    quickSettings->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
     auto quickUpdater=bar->addAction("Update",this,[this]{openSourceUpdater(this);});
     quickUpdater->setToolTip("Check GitHub main, then build, test and install from your local checkout");
     quickUpdater->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
@@ -1299,7 +1302,7 @@ void Editor::addFeature(){if(busy())return;int row=activeRow(),len=ungapped(mode
 void Editor::selectFeature(int idx){const auto &r=model->document.records[activeRow()];if(idx<0||idx>=r.features.size())return;auto f=r.features[idx];int ungap=0,left=-1,right=-1;for(int i=0;i<r.sequence.size();++i)if(r.sequence[i]!='-'){if(ungap==f.start)left=i;if(ungap==f.end-1)right=i;++ungap;}if(left<0||right<0)return;int row=activeRow();QItemSelection sel(model->index(row,left),model->index(row,right));table->selectionModel()->select(sel,QItemSelectionModel::ClearAndSelect);table->scrollTo(model->index(row,left));tabs_->setCurrentIndex(1);}
 void Editor::showAnalysis(const QString &title,const QString &text){QDialog d(this);d.setWindowTitle(title);auto l=new QVBoxLayout(&d);auto view=new QPlainTextEdit;view->setReadOnly(true);view->setPlainText(text);l->addWidget(view);auto b=new QDialogButtonBox(QDialogButtonBox::Close);l->addWidget(b);connect(b,&QDialogButtonBox::rejected,&d,&QDialog::reject);d.resize(650,400);d.exec();}
 void Editor::translateSelected(){if(model->document.alphabet=="Protein"){QMessageBox::information(this,"Translate","Select DNA or RNA first.");return;}bool ok=false;int frame=QInputDialog::getInt(this,"Translation","Frame (standard genetic code, complete codons only)",1,1,3,1,&ok);if(!ok)return;runSafely([&]{const auto &r=model->document.records[activeRow()];showAnalysis("Translation",">"+r.name+" frame "+QString::number(frame)+"\n"+translate(r.sequence,frame-1)+"\n\nStandard code. Ambiguous codons → X. Trailing partial codons omitted. Stops → *. Full active row, not selected columns.");});}
-void Editor::findNext(){QString motif=search_->text().trimmed().toUpper();if(motif.isEmpty())return;if(motif.contains(QRegularExpression("[^A-Z*?-]"))){statusBar()->showMessage("Search uses exact residue symbols; no regular expressions.");return;}int row=activeRow();const auto &s=model->document.records[row].sequence;int from=table->currentIndex().isValid()?table->currentIndex().column()+1:0;int at=s.indexOf(motif,from);if(at<0)at=s.indexOf(motif);if(at<0){statusBar()->showMessage("No exact match in active row. Search does not cross a circular origin.");return;}table->setCurrentIndex(model->index(row,at));QItemSelection sel(model->index(row,at),model->index(row,at+motif.size()-1));table->selectionModel()->select(sel,QItemSelectionModel::ClearAndSelect);table->scrollTo(model->index(row,at));tabs_->setCurrentIndex(0);statusBar()->showMessage("Exact match at alignment column "+QString::number(at+1));}
+void Editor::findNext(){QString motif=search_->text().trimmed().toUpper();if(motif.isEmpty())return;if(motif.contains(QRegularExpression("[^A-Z*?-]"))){statusBar()->showMessage("Search uses exact residue symbols; no regular expressions.");return;}int row=activeRow();const auto &s=model->document.records[row].sequence;int from=table->currentIndex().isValid()?table->currentIndex().column()+1:0;int at=s.indexOf(motif,from);if(at<0)at=s.indexOf(motif);if(at<0){statusBar()->showMessage("No exact match in active row. Search does not cross a circular origin.");return;}table->setCurrentIndex(model->index(row,at));QItemSelection sel(model->index(row,at),model->index(row,at+motif.size()-1));table->selectionModel()->select(sel,QItemSelectionModel::ClearAndSelect);table->scrollTo(model->index(row,at));tabs_->setCurrentIndex(1);statusBar()->showMessage("Exact match at alignment column "+QString::number(at+1));}
 void Editor::showSettings() {
     QSettings stored("HelixEdit","HelixEdit");
     QDialog dialog(this);
@@ -1553,7 +1556,7 @@ void Editor::align(const QString &tool){
     log_->appendPlainText(QString("UTC: %1\nTool: %2\nExecutable: %3\n"
         "Arguments: %4\nInput SHA256: %5\n")
         .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate),tool,exe,args.join(" "),digest));
-    tabs_->setCurrentIndex(2);
+    tabs_->setCurrentIndex(tabs_->count()-1); // Tools is the final workspace tab.
     if(tool=="muscle")connect(job,&QProcess::readyReadStandardOutput,this,[this,job]{auto text=QString::fromUtf8(job->readAllStandardOutput());if(log_->document()->blockCount()>2000)log_->clear();log_->appendPlainText(text.right(16000));});
     connect(job,&QProcess::readyReadStandardError,this,[this,job]{auto text=QString::fromUtf8(job->readAllStandardError());if(log_->document()->blockCount()>2000)log_->clear();log_->appendPlainText(text.right(16000));});
     auto finish=[this,job,original,out,tool](int code,QProcess::ExitStatus status){
