@@ -1459,7 +1459,18 @@ void Editor::showSettings() {
     updatesLayout->addWidget(updateNote);
     auto launchUpdater=new QPushButton("Open update assistant…");
     updatesLayout->addWidget(launchUpdater,0,Qt::AlignLeft);
-    connect(launchUpdater,&QPushButton::clicked,&dialog,[this,&dialog]{
+    connect(launchUpdater,&QPushButton::clicked,&dialog,[this,&dialog,source]{
+        const QString folder=source->text().trimmed();
+        if(!folder.isEmpty() &&
+           (!QFileInfo::exists(QDir(folder).filePath(".git")) ||
+            !QFileInfo::exists(QDir(folder).filePath("CMakeLists.txt")))) {
+            QMessageBox::warning(&dialog,"Choose a Git checkout",
+                "This folder must contain a cloned HelixEdit repository with .git and CMakeLists.txt.");
+            return;
+        }
+        // The update assistant reads this saved path. Other unsaved preference
+        // fields are untouched when launching it.
+        QSettings("HelixEdit","HelixEdit").setValue("updater/source",folder);
         dialog.accept();
         openSourceUpdater(this);
     });
