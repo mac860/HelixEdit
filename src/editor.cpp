@@ -306,14 +306,14 @@ Editor::Editor(bool preview):preview_(preview) {
     analysis->addAction("Pairwise identity matrix…",this,[this]{
         runSafely([&]{
             const auto matrix=pairwiseIdentityMatrix(model->document);
-            QString result="Aligned identity (%), excluding columns with gaps in either sequence.\\n"
-                           "Undefined comparisons are marked NA.\\n\\n";
+            QString result="Aligned identity (%), excluding columns with gaps in either sequence.\n"
+                           "Undefined comparisons are marked NA.\n\n";
             for(int i=0;i<matrix.size();++i){
                 result+=model->document.records[i].name+": ";
                 for(int j=0;j<matrix[i].size();++j)
                     result+=(matrix[i][j]<0?"NA":QString::number(matrix[i][j],'f',2))+
                         (j+1==matrix[i].size()?"":"  |  ");
-                result+="\\n";
+                result+="\n";
             }
             showAnalysis("Pairwise identity matrix",result);
         });
@@ -345,8 +345,8 @@ Editor::Editor(bool preview):preview_(preview) {
             next.records.append(Record{name,assembled.sequence,{},assembled.circular});
             next.warnings.append("Assembly is an exact sequence overlap preview; no biochemical feasibility or junction fidelity is guaranteed.");
             commit(next,"Assemble overlapping fragments");
-            showAnalysis("Assembly preview",QString("Product: %1\\nLength: %2 bp\\n"
-                "Junction overlap: %3 bp\\nCircular: %4\\n\\n"
+            showAnalysis("Assembly preview",QString("Product: %1\nLength: %2 bp\n"
+                "Junction overlap: %3 bp\nCircular: %4\n\n"
                 "No feature annotations were transferred; verify the product before laboratory use.")
                 .arg(name).arg(assembled.sequence.size()).arg(assembled.overlap)
                 .arg(assembled.circular?"yes":"no"));
