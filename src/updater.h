@@ -64,19 +64,19 @@ inline void openSourceUpdater(QWidget *parent) {
         console->insertPlainText(message);
         console->moveCursor(QTextCursor::End);
     };
-    connect(browse,&QPushButton::clicked,&dialog,[&]{
+    QObject::connect(browse,&QPushButton::clicked,&dialog,[&]{
         const auto folder=QFileDialog::getExistingDirectory(&dialog,
             "Select existing HelixEdit Git checkout",sourcePath->text());
         if(!folder.isEmpty())sourcePath->setText(folder);
     });
-    connect(close,&QPushButton::clicked,&dialog,&QDialog::reject);
-    connect(&process,&QProcess::readyRead,&dialog,[&]{
+    QObject::connect(close,&QPushButton::clicked,&dialog,&QDialog::reject);
+    QObject::connect(&process,&QProcess::readyRead,&dialog,[&]{
         append(QString::fromUtf8(process.readAll()));
     });
-    connect(&process,&QProcess::errorOccurred,&dialog,[&](QProcess::ProcessError){
+    QObject::connect(&process,&QProcess::errorOccurred,&dialog,[&](QProcess::ProcessError){
         append("\nProcess error: "+process.errorString()+"\n");
     });
-    connect(&process,QOverload<int,QProcess::ExitStatus>::of(&QProcess::finished),
+    QObject::connect(&process,QOverload<int,QProcess::ExitStatus>::of(&QProcess::finished),
             &dialog,[&](int code,QProcess::ExitStatus status){
         progress->setVisible(false);
         check->setEnabled(true);apply->setEnabled(true);
@@ -121,8 +121,8 @@ inline void openSourceUpdater(QWidget *parent) {
         process.setWorkingDirectory(folder);
         process.start("/bin/bash",{script,folder,mode});
     };
-    connect(check,&QPushButton::clicked,&dialog,[&]{start("--check");});
-    connect(apply,&QPushButton::clicked,&dialog,[&]{start("--apply");});
+    QObject::connect(check,&QPushButton::clicked,&dialog,[&]{start("--check");});
+    QObject::connect(apply,&QPushButton::clicked,&dialog,[&]{start("--apply");});
     dialog.exec();
     // Closing via window decoration while a build runs cancels this process.
     if(process.state()!=QProcess::NotRunning){
