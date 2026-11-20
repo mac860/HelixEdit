@@ -56,7 +56,7 @@ inline int primerWallaceTm(QString s) {
 }
 inline QVector<Primer> readPrimerCsv(const QString &csv) {
  QVector<Primer> result;
- QStringList lines=csv.split(QRegularExpression("\\r?\\n"),Qt::SkipEmptyParts);
+ QStringList lines=csv.split(QRegularExpression("\r?\n"),Qt::SkipEmptyParts);
  for(QString line:lines){
   auto fields=line.split(',');
   if(fields.size()<2)continue;
