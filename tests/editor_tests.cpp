@@ -113,6 +113,25 @@ private slots:
         if(before.isValid())settings.setValue("updater/source",before);
         else settings.remove("updater/source");
     }
+    void compactToolbarAndUnobtrusiveNotices() {
+        Editor editor(true);
+        auto *quick=editor.findChild<QToolBar*>("quickActions");
+        auto *ribbon=editor.findChild<QTabWidget*>("commandRibbon");
+        auto *search=editor.findChild<QLineEdit*>("quickSearch");
+        auto *molecule=editor.findChild<QComboBox*>("compactMoleculeSelector");
+        auto *find=editor.findChild<QPushButton*>("quickFind");
+        auto *notices=editor.findChild<QLabel*>("warningStatusIndicator");
+        auto *offline=editor.findChild<QLabel*>("offlineStatus");
+        QVERIFY(quick);QVERIFY(ribbon);QVERIFY(search);
+        QVERIFY(molecule);QVERIFY(find);QVERIFY(notices);QVERIFY(offline);
+        QCOMPARE(quick->toolButtonStyle(),Qt::ToolButtonIconOnly);
+        QVERIFY(ribbon->maximumHeight()<=55);
+        QCOMPARE(notices->parentWidget(),static_cast<QWidget*>(editor.statusBar()));
+        QCOMPARE(offline->parentWidget(),static_cast<QWidget*>(editor.statusBar()));
+        QVERIFY(!editor.centralWidget()->findChild<QLabel*>("warningStatusIndicator"));
+        QCOMPARE(quick->findChild<QLineEdit*>("quickSearch"),search);
+        QCOMPARE(quick->findChild<QComboBox*>("compactMoleculeSelector"),molecule);
+    }
     void settingsCentralizePreferencesAndAboutCredits() {
         Editor editor(true);
         auto settingsAction=editor.findChild<QAction*>("openSettings");
@@ -156,6 +175,7 @@ private slots:
         QCOMPARE(savedTheme(),QString("Dracula"));
         applyTheme(savedPrevious);
         bool aboutVisible=false,hasCredit=false,hasRepo=false,hasEmail=false;
+        bool hasAppIcon=false,hasGradientHero=false,linkCopied=false;
         // The Help action owns the submenu; use its exact text rather than traversal order.
         QAction *aboutAction=nullptr;
         for(auto *menuAction:editor.menuBar()->actions()){
@@ -173,6 +193,15 @@ private slots:
             hasCredit=visible.contains("Developed and edited by Wael H");
             hasRepo=visible.contains("https://github.com/mac860/HelixEdit");
             hasEmail=visible.contains("waelye@gmail.com");
+            auto *icon=dialog->findChild<QLabel*>("aboutAppIcon");
+            hasAppIcon=icon && !icon->pixmap().isNull();
+            hasGradientHero=dialog->findChild<QFrame*>("aboutHero")!=nullptr;
+            auto *copy=dialog->findChild<QPushButton*>("aboutCopyLink");
+            if(copy){
+                copy->click();
+                linkCopied=QGuiApplication::clipboard()->text()==
+                    "https://github.com/mac860/HelixEdit";
+            }
             dialog->reject();
         });
         aboutAction->trigger();
@@ -180,6 +209,9 @@ private slots:
         QVERIFY(hasCredit);
         QVERIFY(hasRepo);
         QVERIFY(hasEmail);
+        QVERIFY(hasAppIcon);
+        QVERIFY(hasGradientHero);
+        QVERIFY(linkCopied);
     }
     void updaterEntryIsAvailable() {
         Editor editor(true);
