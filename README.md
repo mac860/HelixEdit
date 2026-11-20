@@ -4,11 +4,36 @@
 
 Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
 
-**Status: 0.1.9 beta development on `main` (native Ubuntu/CI verification pending).** The new Debian install helper avoids APT's unsandboxed-root notice by safely staging local packages; core app functionality remains unchanged.
+**Status: 0.2.0 beta source on `main` (new native builds and UI tests not yet verified).** The 0.2 redesign replaces the top command ribbon with a left activity rail and a colored context-tool panel, while preserving the underlying sequence editors, menu actions and scientific algorithms. Validate platform builds before publishing a release.
 
 ![HelixEdit sequence map](docs/map.png)
 
 ![HelixEdit alignment editor](docs/alignment.png)
+
+## New in 0.2.0 beta — HelixEdit Glass Studio
+
+**A (navigation):** The former top Sequence / Plasmid / Analysis ribbon is replaced by a narrow **left activity rail** with saturated blue, violet and emerald icon tiles. Each mode activates a scrollable, workspace-specific tool panel. These panels expose **the existing menu actions**, rather than implementing duplicate scientific commands.
+
+- **Sequence** (cyan): Sequence viewer, Add, Rename, Remove, Insert Gap, Reverse Complement, Translate and Find ORFs.
+- **Plasmid** (violet): Map, Enzymes, Features and Primers views, plus Addgene search/import, restriction analysis, annotated GenBank export and overlap assembly.
+- **Analysis** (emerald): Local Tools and History views, MAFFT, MUSCLE 5, local BLAST+, Consensus, Identity Matrix, p-distance, Statistics and PHYLIP.
+- **Canvas-first design:** the seven existing scientific pages remain intact but are accessed from the left panel; their redundant upper tab bar is hidden. The project explorer can be shown/hidden with the lower activity button (**Ctrl+Shift+E**), and the tools panel can also collapse. The initial Plasmid workspace hides the project explorer to maximize map width.
+- **Shared command behavior:** Actions and shortcuts still use the original File, View, Edit, Analysis, Cloning and Tools menu entries. The status bar retains any scientific validation notices.
+
+**B (appearance):** All three themes (Light, Dark and Dracula) gain saturated workspace accents, gradient-backed icon tiles, rounded 15–19 px rail/panel corners, alpha-blended translucent surfaces, bright active-mode outlines and readable hover/focus states. The native purple/teal HelixEdit application icon remains unchanged. This is **glass-inspired rendering in Qt Widgets**, not compositor background blur.
+
+The beta is independent of BioEdit and SnapGene and must not be assumed scientifically validated solely from its interface. See [0.2 UI architecture and test notes](docs/GUI_020.md).
+
+### Update the existing Ubuntu source installation
+
+```bash
+cd ~/Downloads/v3/HelixEdit
+git pull --ff-only origin main
+bash scripts/build_ubuntu_deb.sh
+bash scripts/install_ubuntu_deb.sh
+```
+
+The helper installs the versioned `HelixEdit-0.2.0-x86_64.deb` without exposing your source directory to the APT sandbox. **Do not** prefix the helper with `sudo`; it obtains permission only for the system install.
 
 ## New in 0.1.9: sandbox-friendly Ubuntu DEB installation
 
@@ -200,7 +225,7 @@ git pull --ff-only origin main
 bash scripts/build_ubuntu_deb.sh
 ```
 
-The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.9-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
+The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.2.0-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
 
 Install the generated package through the sandbox-friendly installer:
 
@@ -209,7 +234,7 @@ bash scripts/install_ubuntu_deb.sh
 helixedit
 ```
 
-An explicit package path is also supported: `bash scripts/install_ubuntu_deb.sh ./build-ubuntu-amd64/HelixEdit-0.1.9-x86_64.deb`. Avoid invoking `sudo` on the helper itself: it builds a temporary APT-readable copy as your normal user and asks for sudo only when installing.
+An explicit package path is also supported: `bash scripts/install_ubuntu_deb.sh ./build-ubuntu-amd64/HelixEdit-0.2.0-x86_64.deb`. Avoid invoking `sudo` on the helper itself: it builds a temporary APT-readable copy as your normal user and asks for sudo only when installing.
 
 **If a build fails**, copy the first `error:` message and the final 50 lines from the newest `build-logs/build-amd64-*.log` file. Do not run CMake with `sudo`, reuse an old CMake cache from a different Qt version, or run `cpack` before compilation completes.
 
