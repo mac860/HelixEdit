@@ -11,6 +11,7 @@ Document readDocument(const QString &path);
 void writeProject(const QString &path, const Document &doc);
 QString fasta(const Document &doc);
 QString clustal(const Document &doc);
+QString genbank(const Document &doc); // exports simple intervals; rejects unsupported names
 QString ungapped(QString seq);
 QString reverseComplement(const QString &seq, bool rna=false);
 QString translate(const QString &seq, int frame=0); // standard genetic code; gaps rejected
