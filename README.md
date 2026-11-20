@@ -1,14 +1,20 @@
 # HelixEdit
 
-**A compact, colourful, offline sequence studio for macOS Apple Silicon and Ubuntu ARM64.**
+**A compact, colourful, offline sequence studio for Ubuntu x86_64/ARM64 and macOS Apple Silicon.**
 
 Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
 
-**Status: 0.1.1 beta candidate (not yet verified).** Local Linux x86_64 tests pass. Native Ubuntu 24.04 x86_64 and ARM64 CI builds, real-aligner integration tests, rendering and Debian packaging have also passed. The Apple Silicon build job is supplied but remains queued; macOS is not yet verified. Target-device desktop testing is still recommended. Full BioEdit feature parity is not claimed.
+**Status: 0.1.2 beta development on `main` (new GUI compilation/CI verification pending).** The preceding 0.1.1 Ubuntu 26.04 x86_64 source build was confirmed by a user after compiler fixes; that confirmation does not validate the new 0.1.2 GUI. CI workflows target Ubuntu x86_64/ARM64 and macOS Apple Silicon. Test each new artifact before release.
 
 ![HelixEdit sequence map](docs/map.png)
 
 ![HelixEdit alignment editor](docs/alignment.png)
+
+## New in 0.1.2: Compact HelixEdit Studio
+
+The interface uses a compact top toolbar, left searchable sequence navigator, and map-first tabs: **Map, Sequence, Enzymes, Features, Primers, History and Tools**. Circular and linear maps draw readable colored annotations and exact enzyme recognition positions. Map layers and zoom are adjustable; undo, primer library and reproducibility logs are functional. Appearance settings include **Light, Dark and Dracula**.
+
+The built-in enzyme catalog remains an eight-motif scientific preview, not a full digest simulator. Primer3 and other scientific engines require their own optional installations. See [GUI design, functionality and validation notes](docs/GUI_012.md).
 
 ## Three scientific workspaces (development roadmap)
 
@@ -20,7 +26,7 @@ HelixEdit is being developed around three connected, offline-first workspaces. T
 | **Plasmid Studio** | Interactive circular/linear maps, restriction analysis, cloning simulations, rich GenBank compatibility, primer binding sites and feature tracks | [Detailed specification](ROADMAP.md#2-plasmid-studio--maps-restriction-analysis-and-cloning) |
 | **Analysis Studio** | Optional local MAFFT, MUSCLE and BLAST+ tools, sequence statistics, distance matrices and later phylogenetic inference | [Detailed specification](ROADMAP.md#3-analysis-studio--reproducible-local-bioinformatics) |
 
-The full [scientific development roadmap](ROADMAP.md) defines user workflows, acceptance criteria, testing requirements and staged releases. Existing alignment and map functionality remains available; advanced ORF, cloning, BLAST UI and phylogenetics features are not yet shipped.
+The full [scientific development roadmap](ROADMAP.md) defines user workflows, acceptance criteria, testing requirements and staged releases. Existing alignment, six-frame ORF finding, exact-overlap previews and local BLAST+ support are available as limited development workflows; richer cloning models, complex annotated GenBank round-trips and in-app phylogenetic inference remain planned.
 
 ## Academic workflow development — current main branch
 
@@ -66,7 +72,7 @@ git pull --ff-only origin main
 bash scripts/build_ubuntu_deb.sh
 ```
 
-The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates `HelixEdit-0.1.1-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
+The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.2-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
 
 Install the generated package (use the exact path printed by the script):
 
