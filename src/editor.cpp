@@ -2,6 +2,7 @@
 #include "themes.h"
 #include "orf.h"
 #include "restriction.h"
+#include "primer.h"
 #include <QtSvg/QSvgGenerator>
 #include <QDesktopServices>
 #include <cmath>
@@ -270,7 +271,57 @@ Editor::Editor(bool preview):preview_(preview) {
     }actions->addStretch();al->addLayout(actions);tabs_->addTab(alignment,"01  Alignment");
     auto mapPage=new QWidget;auto ml=new QVBoxLayout(mapPage);mapTitle_=new QLabel;mapTitle_->setStyleSheet("font-size:16px;font-weight:bold;padding:12px;");ml->addWidget(mapTitle_);
     map_=new MapView;ml->addWidget(map_,1);
+    auto primerButton=new QPushButton("Primer library");
+    connect(primerButton,&QPushButton::clicked,this,[this]{
+        if(model->document.alphabet=="Protein"){
+            QMessageBox::information(this,"Primer library","Choose a nucleotide project first.");return;
+        }
+        QDialog dlg(this);dlg.setWindowTitle("Primer library · local CSV");
+        dlg.resize(700,500);
+        auto layout=new QVBoxLayout(&dlg);
+        auto help=new QLabel("One primer per line: name,sequence,notes. Local-only library. Exact IUPAC-aware binding; no mismatch scoring.");
+        help->setWordWrap(true);layout->addWidget(help);
+        auto editor=new QPlainTextEdit;layout->addWidget(editor);
+        const QString base=QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        const QString libraryPath=QDir(base).filePath("primers.csv");
+        QFile input(libraryPath);
+        if(input.open(QIODevice::ReadOnly))editor->setPlainText(QString::fromUtf8(input.readAll()));
+        else editor->setPlainText("name,sequence,notes\\n");
+        auto actions=new QHBoxLayout;
+        auto mapButton=new QPushButton("Map primers to active plasmid");
+        auto saveButton=new QPushButton("Save library");
+        actions->addWidget(mapButton);actions->addWidget(saveButton);layout->addLayout(actions);
+        auto output=new QPlainTextEdit;output->setReadOnly(true);layout->addWidget(output);
+        connect(saveButton,&QPushButton::clicked,&dlg,[=]{
+            if(!QDir().mkpath(base)){QMessageBox::warning(&dlg,"Primer library","Cannot create data folder.");return;}
+            QSaveFile file(libraryPath);
+            QByteArray bytes=editor->toPlainText().toUtf8();
+            if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit()){
+                QMessageBox::warning(&dlg,"Primer library","Unable to save primer library.");return;
+            }
+            output->setPlainText("Library saved locally: "+libraryPath);
+        });
+        connect(mapButton,&QPushButton::clicked,&dlg,[=,this]{
+            const auto primers=readPrimerCsv(editor->toPlainText());
+            const auto &record=model->document.records[activeRow()];
+            QString result=QString("%1 · %2 primers\\n\\n").arg(record.name).arg(primers.size());
+            for(const auto &primer:primers){
+                auto hits=primerHits(record,primer.sequence);
+                result+=QString("%1  [%2 nt; GC %3%; Wallace ~%4 C]  %5 hits\\n")
+                    .arg(primer.name).arg(primer.sequence.size())
+                    .arg(primerGc(primer.sequence),0,'f',1).arg(primerWallaceTm(primer.sequence))
+                    .arg(hits.size());
+                for(const auto &hit:hits)
+                    result+=QString("  %1–%2  %3%4\\n").arg(hit.start+1).arg(hit.end)
+                        .arg(hit.reverse?"reverse":"forward")
+                        .arg(hit.end>ungapped(record.sequence).size()?" (wraps origin)":"");
+            }
+            output->setPlainText(result);
+        });
+        dlg.exec();
+    });
     auto mapButtons=new QHBoxLayout;
+    mapButtons->addWidget(primerButton);
     auto restrictionButton=new QPushButton("Restriction sites");
     mapButtons->addWidget(restrictionButton);
     connect(restrictionButton,&QPushButton::clicked,this,[this]{
