@@ -54,27 +54,39 @@ Recent source commits add **annotated GenBank export** (simple interval features
 - Local asynchronous MAFFT 7 and MUSCLE 5 adapters with stable sequence IDs, input/output validation and undoable results.
 - Optional Biopython conversion script; no Python runtime is needed by the desktop app.
 
-## Build on Ubuntu (ARM64 or x86_64)
+## Build a native Ubuntu 26.04 x86_64 .deb
 
-Use packages for the architecture of the operating system you are running:
+From the **repository root** (the directory containing `CMakeLists.txt`):
 
 ```bash
 sudo apt update
-sudo apt install build-essential cmake qt6-base-dev qt6-svg-dev dpkg-dev
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel 2
-ctest --test-dir build --output-on-failure
-./build/helixedit
+sudo apt install -y git build-essential cmake ninja-build pkg-config \
+  qt6-base-dev qt6-svg-dev dpkg-dev
+git pull --ff-only origin main
+bash scripts/build_ubuntu_deb.sh
 ```
 
-To create an architecture-native Debian package:
+The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates `HelixEdit-0.1.1-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
+
+Install the generated package (use the exact path printed by the script):
 
 ```bash
-(cd build && cpack -G DEB)
-sudo apt install ./build/HelixEdit-*.deb
+sudo apt install ./build-ubuntu-amd64/HelixEdit-*.deb
+helixedit
 ```
 
-The `.deb` uses the distribution's Qt libraries; it does not bundle a browser, Python, alignment software or Qt itself. Package on the oldest Ubuntu release you intend to support. A package built on a newer release may require newer system libraries. The workflow builds on Ubuntu 24.04, including ARM64.
+**If a build fails**, copy the first `error:` message and the final 50 lines from the newest `build-logs/build-amd64-*.log` file. Do not run CMake with `sudo`, reuse an old CMake cache from a different Qt version, or run `cpack` before compilation completes.
+
+For manual builds:
+
+```bash
+cmake -S . -B build-ubuntu-amd64 -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+cmake --build build-ubuntu-amd64 --parallel 2
+QT_QPA_PLATFORM=offscreen ctest --test-dir build-ubuntu-amd64 --output-on-failure
+(cd build-ubuntu-amd64 && cpack -G DEB)
+```
+
+The native `.deb` uses the Ubuntu distribution's Qt libraries rather than bundling Qt. MAFFT, MUSCLE, BLAST+ and Primer3 are optional external scientific tools, not mandatory build dependencies.
 
 ## Build on Mac M1 / M2 / M3 / M4
 
