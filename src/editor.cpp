@@ -3,6 +3,7 @@
 #include "orf.h"
 #include "restriction.h"
 #include "primer.h"
+#include "academic.h"
 #include <QtSvg/QSvgGenerator>
 #include <QDesktopServices>
 #include <cmath>
@@ -302,6 +303,55 @@ Editor::Editor(bool preview):preview_(preview) {
         QMap<QString,QString> motifs={{"EcoRI","GAATTC"},{"BamHI","GGATCC"},{"HindIII","AAGCTT"},{"NotI","GCGGCCGC"}};
         for(auto it=motifs.cbegin();it!=motifs.cend();++it){QStringList hits;QString scan=s;if(r.circular)scan+=s.left(it.value().size()-1);for(int i=0;i<s.size();++i)if(scan.mid(i,it.value().size())==it.value())hits<<QString::number(i+1);out+="\n"+it.key()+" ("+it.value()+"): "+(hits.isEmpty()?"none":hits.join(", "));}showAnalysis("Restriction sites",out);
     });
+    analysis->addAction("Pairwise identity matrix…",this,[this]{
+        runSafely([&]{
+            const auto matrix=pairwiseIdentityMatrix(model->document);
+            QString result="Aligned identity (%), excluding columns with gaps in either sequence.\\n"
+                           "Undefined comparisons are marked NA.\\n\\n";
+            for(int i=0;i<matrix.size();++i){
+                result+=model->document.records[i].name+": ";
+                for(int j=0;j<matrix[i].size();++j)
+                    result+=(matrix[i][j]<0?"NA":QString::number(matrix[i][j],'f',2))+
+                        (j+1==matrix[i].size()?"":"  |  ");
+                result+="\\n";
+            }
+            showAnalysis("Pairwise identity matrix",result);
+        });
+    });
+    auto cloningMenu=menuBar()->addMenu("&Cloning");
+    cloningMenu->addAction("Assemble selected fragments by exact overlap…",this,[this]{
+        if(busy()||model->document.alphabet=="Protein")return;
+        QSet<int> selected;
+        for(const auto &range:table->selectionModel()->selection())
+            for(int i=range.top();i<=range.bottom();++i)selected.insert(i);
+        auto rows=selected.values();std::sort(rows.begin(),rows.end());
+        if(rows.size()!=2){
+            QMessageBox::information(this,"Overlap assembly",
+                "Select exactly two sequence rows in the desired 5′ to 3′ order.");return;
+        }
+        bool ok=false;
+        int minimum=QInputDialog::getInt(this,"Overlap assembly",
+            "Minimum exact overlap (bp)",15,1,1000,1,&ok);
+        if(!ok)return;
+        const bool circular=QMessageBox::question(this,"Topology",
+            "Attempt to circularize the assembled product using an additional terminal overlap?",
+            QMessageBox::Yes|QMessageBox::No)==QMessageBox::Yes;
+        runSafely([&]{
+            const auto &left=model->document.records[rows[0]];
+            const auto &right=model->document.records[rows[1]];
+            auto assembled=assembleOverlap(left.sequence,right.sequence,minimum,circular);
+            auto next=model->document;
+            const QString name=QString("assembly_%1_%2").arg(rows[0]+1).arg(rows[1]+1);
+            next.records.append(Record{name,assembled.sequence,{},assembled.circular});
+            next.warnings.append("Assembly is an exact sequence overlap preview; no biochemical feasibility or junction fidelity is guaranteed.");
+            commit(next,"Assemble overlapping fragments");
+            showAnalysis("Assembly preview",QString("Product: %1\\nLength: %2 bp\\n"
+                "Junction overlap: %3 bp\\nCircular: %4\\n\\n"
+                "No feature annotations were transferred; verify the product before laboratory use.")
+                .arg(name).arg(assembled.sequence.size()).arg(assembled.overlap)
+                .arg(assembled.circular?"yes":"no"));
+        });
+    });
     auto tools=menuBar()->addMenu("&Tools");
     tools->addAction("Align with MAFFT",this,[this]{align("mafft");});
     tools->addAction("Align with MUSCLE 5",this,[this]{align("muscle");});
@@ -391,6 +441,8 @@ Editor::Editor(bool preview):preview_(preview) {
     auto orfA=actionFor(analysis,"Find open reading frames…",QStyle::SP_FileDialogDetailedView);
     auto consensusA=actionFor(analysis,"Consensus",QStyle::SP_DialogApplyButton);
     auto restrictA=actionFor(analysis,"Common restriction sites",QStyle::SP_FileDialogContentsView);
+    auto assemblyA=actionFor(cloningMenu,"Assemble selected fragments by exact overlap…",QStyle::SP_FileDialogDetailedView);
+    auto matrixA=actionFor(analysis,"Pairwise identity matrix…",QStyle::SP_FileDialogContentsView);
     auto mafftA=actionFor(tools,"Align with MAFFT",QStyle::SP_BrowserReload);
     auto muscleA=actionFor(tools,"Align with MUSCLE 5",QStyle::SP_BrowserReload);
     auto configA=actionFor(tools,"Configure executables…",QStyle::SP_FileDialogDetailedView);
@@ -403,9 +455,9 @@ Editor::Editor(bool preview):preview_(preview) {
     addRibbonCategory("Sequence",{{"Add",addA},{"Rename",renameA},{"Remove",removeA},{"Insert gap",gapA},
                                   {"Reverse",reverseA},{"Translate",translateA},{"Find ORFs",orfA}});
     addRibbonCategory("Plasmid",{{"Addgene ID",addgeneA},{"Import GenBank",importA},
-                                 {"Restriction",restrictA},{"Export GB",gbExportA}});
+                                 {"Restriction",restrictA},{"Export GB",gbExportA},{"Assemble",assemblyA}});
     addRibbonCategory("Analysis",{{"MAFFT",mafftA},{"MUSCLE",muscleA},
-                                  {"Consensus",consensusA},{"ORFs",orfA},{"Tool settings",configA}});
+                                  {"Consensus",consensusA},{"Matrix",matrixA},{"ORFs",orfA},{"Tool settings",configA}});
     layout->addWidget(ribbon);
     auto strip=new QHBoxLayout;auto title=new QLabel("<b style='font-size:19px'>Your sequences, in focus.</b>");strip->addWidget(title);strip->addStretch();
     molecule_=new QComboBox;molecule_->addItems({"DNA","RNA","Protein"});molecule_->setToolTip("Verify molecule type; short proteins cannot always be inferred from letters.");strip->addWidget(molecule_);
