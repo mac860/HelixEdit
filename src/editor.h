@@ -1,5 +1,6 @@
 #pragma once
 #include "sequence.h"
+#include "wrapped_sequence.h"
 #include <QtWidgets>
 #include <memory>
 namespace helix {
@@ -74,6 +75,12 @@ private:
     QTabWidget *tabs_;
     MapView *map_=nullptr;
     CompositionView *composition_=nullptr;
+    WrappedSequenceView *wrapped_=nullptr;
+    QStackedWidget *sequenceViews_=nullptr;
+    QCheckBox *wrapToggle_=nullptr;
+    QCheckBox *complementToggle_=nullptr;
+    QCheckBox *wrappedFeaturesToggle_=nullptr;
+
     QLabel *stats_,*selection_,*notice_,*mapTitle_;
     QListWidget *features_;
     QListWidget *navigator_=nullptr;
