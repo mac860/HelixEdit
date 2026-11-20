@@ -4,7 +4,7 @@
 
 Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
 
-**Status: 0.1.0 development preview.** Local Linux x86_64 tests pass. Native Ubuntu 24.04 x86_64 and ARM64 CI builds, real-aligner integration tests, rendering and Debian packaging have also passed. The Apple Silicon build job is supplied but remains queued; macOS is not yet verified. Target-device desktop testing is still recommended. Full BioEdit feature parity is not claimed.
+**Status: 0.1.1 beta candidate (not yet verified).** Local Linux x86_64 tests pass. Native Ubuntu 24.04 x86_64 and ARM64 CI builds, real-aligner integration tests, rendering and Debian packaging have also passed. The Apple Silicon build job is supplied but remains queued; macOS is not yet verified. Target-device desktop testing is still recommended. Full BioEdit feature parity is not claimed.
 
 ![HelixEdit sequence map](docs/map.png)
 
@@ -142,3 +142,7 @@ Automated tests cover all 64 standard codons, ambiguity/complement handling, par
 [Architecture](docs/ARCHITECTURE.md) · [Sources](docs/SOURCES.md) · [Validation](docs/VALIDATION.md)
 
 MIT license for HelixEdit's own code. Qt, Biopython and optional executables retain their respective licenses. Qt is dynamically linked; bundled distributions must preserve applicable notices and comply with Qt's licensing terms.
+
+## 0.1.1 beta candidate
+
+The Appearance menu offers Light, Dark and Dracula themes, persisted with Qt QSettings. This branch is a source candidate, not a published or independently tested release. Existing 0.1.0 CI artifacts remain 0.1.0; build and validate all target platforms before tagging 0.1.1.
