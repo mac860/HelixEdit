@@ -13,6 +13,6 @@ int main(int argc,char **argv){
     helix::Editor editor(preview);
     if(!parser.positionalArguments().isEmpty())try{editor.loadPath(parser.positionalArguments().first());}catch(const std::exception &e){QMessageBox::warning(nullptr,"Cannot open file",e.what());}
     editor.show();
-    if(preview)QTimer::singleShot(200,[&]{if(parser.isSet("map-preview"))editor.findChild<QTabWidget*>("studioTabs")->setCurrentIndex(0);app.processEvents();bool ok=editor.grab().save(parser.value("screenshot"));app.exit(ok?0:2);});
+    if(preview)QTimer::singleShot(200,[&]{if(auto studio=editor.findChild<QTabWidget*>("studioTabs"))studio->setCurrentIndex(parser.isSet("map-preview")?0:1);app.processEvents();bool ok=editor.grab().save(parser.value("screenshot"));app.exit(ok?0:2);});
     return app.exec();
 }
