@@ -4,11 +4,23 @@
 
 Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
 
-**Status: 0.1.4 beta development on `main` (new build/CI verification pending).** Previous Ubuntu 26.04 x86_64 builds were user-tested, but the new 0.1.4 graphics, launcher and package changes still require compilation and desktop validation. GitHub Actions targets Ubuntu x86_64/ARM64 and macOS Apple Silicon. Run all tests before publishing.
+**Status: 0.1.5 beta development on `main` (new build and CI verification pending).** Existing Ubuntu source builds have been user-tested, but the 0.1.5 wrapped-sequence renderer still requires compilation and desktop validation on Ubuntu x86_64/ARM64 and macOS ARM64.
 
 ![HelixEdit sequence map](docs/map.png)
 
 ![HelixEdit alignment editor](docs/alignment.png)
+
+## New in 0.1.5: Wrap to Window in Sequence
+
+The **Sequence** tab now offers a responsive, SnapGene-style **Wrap to Window** option (an independent HelixEdit implementation; no SnapGene code or assets). It reflows the **active sequence** into as many blocks as fit the available editor width, recalculating the bases-per-line when the window or sidebar is resized.
+
+- **Wrap to Window** (on by default for new settings): shows one active DNA, RNA, or protein sequence in compact, vertically scrolling blocks with 10-base grouping, coordinate ruler, 5′/3′ labels, and colored residues.
+- **Complementary strand** (DNA/RNA only): displays the **aligned** 3′→5′ complement beneath the 5′→3′ primary strand. This is display-only, not an exported reverse complement.
+- **Feature tracks**: draws directional, colored annotation arrows across wrapped blocks; complete coordinates and metadata remain available in the Features panel.
+- **Click a base** to select its original alignment column; **double-click** to switch to the original editable **Grid** at that position. The underlying sequence, annotations, and undo history do not change when switching views.
+- **Wrap off** returns to the original multi-record, editable alignment grid. For DNA/RNA and protein, all alignment and analysis commands continue to operate on the underlying data.
+
+The controls also appear in **Settings → Preferences → Map & editing** and persist as `sequence/wrapToWindow`, `sequence/showComplement`, and `sequence/showFeatures`. For short sequences, only one wrapped block is needed. This initial implementation is a read-only visualization; it does not perform annotation editing or multi-sequence alignment editing inside the wrapped canvas. [Implementation and test notes](docs/GUI_015.md).
 
 ## New in 0.1.4: Visual examples, icon & automatic source discovery
 
@@ -129,12 +141,12 @@ git pull --ff-only origin main
 bash scripts/build_ubuntu_deb.sh
 ```
 
-The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.4-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
+The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.5-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
 
 Install the generated package (use the exact path printed by the script):
 
 ```bash
-sudo apt install --reinstall ./build-ubuntu-amd64/HelixEdit-0.1.4-x86_64.deb
+sudo apt install --reinstall ./build-ubuntu-amd64/HelixEdit-0.1.5-x86_64.deb
 helixedit
 ```
 
