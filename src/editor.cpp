@@ -301,11 +301,15 @@ void Editor::align(const QString &tool){
     table->setEnabled(false);molecule_->setEnabled(false);history->setActive(false); // menu undo disabled explicitly below
     auto undoActions=menuBar()->actions()[1]->menu()->actions();for(auto a:undoActions)a->setEnabled(false);
     log_->clear();log_->appendPlainText("Running "+tool+"\n"+exe+"\n"+args.join(" ")+"\n");tabs_->setCurrentIndex(2);
+    if(tool=="muscle")connect(job,&QProcess::readyReadStandardOutput,this,[this,job]{auto text=QString::fromUtf8(job->readAllStandardOutput());if(log_->document()->blockCount()>2000)log_->clear();log_->appendPlainText(text.right(16000));});
     connect(job,&QProcess::readyReadStandardError,this,[this,job]{auto text=QString::fromUtf8(job->readAllStandardError());if(log_->document()->blockCount()>2000)log_->clear();log_->appendPlainText(text.right(16000));});
-    auto finish=[this,job,original,out,undoActions](int code,QProcess::ExitStatus status){
+    auto finish=[this,job,original,out,undoActions,tool](int code,QProcess::ExitStatus status){
         if(process_!=job)return;process_=nullptr;table->setEnabled(true);molecule_->setEnabled(true);history->setActive(true);for(auto a:undoActions)a->setEnabled(true);if(undoActions.size()>=2){undoActions[0]->setEnabled(history->canUndo());undoActions[1]->setEnabled(history->canRedo());}
         if(code==0&&status==QProcess::NormalExit&&!job->property("cancelled").toBool()){try{auto aligned=readDocument(out);auto d=acceptAlignment(original,aligned);commit(d,"Apply local alignment");log_->appendPlainText("\nValidated and applied. Original names, features and row order preserved. Undo available.");}catch(const std::exception &e){log_->appendPlainText("Rejected output: "+QString::fromUtf8(e.what()));}}
-        else log_->appendPlainText(job->property("cancelled").toBool()?"Job cancelled. Document unchanged.":"Job failed. Document unchanged. Exit code: "+QString::number(code));
+        else {
+        if(tool=="muscle" && log_->toPlainText().contains("sizeof(void *)"))log_->appendPlainText("This MUSCLE build has a known ARM64 pointer-width detection issue. Prefer MAFFT, or build MUSCLE with scripts/build_muscle_arm64.sh and configure its executable path.");
+        log_->appendPlainText(job->property("cancelled").toBool()?"Job cancelled. Document unchanged.":"Job failed. Document unchanged. Exit code: "+QString::number(code));
+        }
         job->deleteLater();temp_.reset();statusBar()->showMessage("Alignment job finished; see Local tools log.");
     };
     connect(job,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),this,finish);

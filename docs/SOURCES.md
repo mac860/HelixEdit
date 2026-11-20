@@ -20,4 +20,6 @@ Checked 20 November 2026. External dependencies retain their own licenses.
 | BLAST+ | https://www.ncbi.nlm.nih.gov/books/NBK279690/ | Planned search integration; no search adapter yet |
 | GitHub runners | https://docs.github.com/en/actions/reference/runners/github-hosted-runners | ARM64 and macOS build matrix |
 
+ARM64 MUSCLE platform issue and upstream fix: https://github.com/rcedgar/muscle/issues/103, https://github.com/rcedgar/muscle/pull/104 and https://github.com/rcedgar/muscle/pull/73. The optional Linux ARM64 helper pins v5.3 source commit `2cf9d33078c9a85697e38a6f3ad827e6862420df` and checks the official build generator checksum. macOS MUSCLE uses the maintained https://github.com/brewsci/homebrew-bio formula.
+
 HelixEdit is independent of BioEdit and SnapGene. Neither project endorses or maintains this application.

@@ -84,8 +84,17 @@ Translation uses the entire active row, rejects gaps, uses the standard code and
 sudo apt install mafft muscle ncbi-blast+
 
 # macOS; use native ARM packages
-brew install mafft muscle blast
+brew install mafft blast
+brew install brewsci/bio/muscle
 ```
+
+On Linux ARM64, the Ubuntu 24.04 MUSCLE 5.1 package failed the integration check while MAFFT passed. Upstream documents a missing `__aarch64__` pointer-width check. For a pinned MUSCLE 5.3 source build with that platform fix:
+
+```bash
+bash scripts/build_muscle_arm64.sh "$HOME/.local"
+```
+
+This helper downloads official upstream source and a checksum-verified build generator, compiles for ARM64 and installs only in the requested prefix. MAFFT remains the simplest default on ARM64.
 
 Open **Tools → Configure executables** to supply paths if PATH discovery fails. On Apple Silicon, `/opt/homebrew/bin` is checked for alignment executables. MUSCLE must be version 5; the old MUSCLE 3 command syntax is not used. BLAST+ has path configuration only in this version; a search UI is planned. Third-party programs are not bundled, automatically downloaded or installed.
 

@@ -34,7 +34,8 @@ private slots:
         QSettings settings;settings.setValue("tools/"+tool,exe);Editor e(true);
         auto original=parseFasta(">reference\nATGGCTACGTTAGGCTACGATCGATCGTAGCTAGCATCGATCGTAGCTAGC\n>variant_A\nATGGCTACGTTAGGCTACGATCGATCGTAGCTAGCATCGATCGTAGCTTGC\n>variant_B\nATGGCTACGTTAGGCTACGATCGAT---TAGCTAGCATCGATCGTAGCTAGC\n");e.setDocument(original);
         QPushButton *button=nullptr;for(auto b:e.findChildren<QPushButton*>())if(b->text()=="Align document with "+tool.toUpper())button=b;QVERIFY(button);button->click();
-        QTRY_COMPARE_WITH_TIMEOUT(e.history->count(),1,60000);
+        QTRY_VERIFY_WITH_TIMEOUT(e.table->isEnabled(),30000);
+        auto log=e.findChildren<QPlainTextEdit*>().last();QVERIFY2(e.history->count()==1,qPrintable(log->toPlainText()));
         for(int i=0;i<original.records.size();++i)QCOMPARE(ungapped(e.model->document.records[i].sequence),ungapped(original.records[i].sequence));
         settings.remove("tools/"+tool);
     }
