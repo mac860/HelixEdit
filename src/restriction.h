@@ -24,9 +24,9 @@ inline QVector<RestrictionSite> findRestrictionSites(const Record &record) {
   if(motif.size()>n)continue;
   const QString search=record.circular?seq+seq.left(motif.size()-1):seq;
   for(int pos=0;pos<n;++pos) {
-   if(!record.circular && pos+motif.size()>n)break;
+   if(!record.circular && pos+int(motif.size())>n)break;
    if(search.mid(pos,motif.size())==motif)
-    result.append({entry.first,pos,pos+motif.size(),false});
+    result.append({entry.first,pos,pos+int(motif.size()),false});
   }
  }
  std::sort(result.begin(),result.end(),[](const auto &a,const auto &b){
