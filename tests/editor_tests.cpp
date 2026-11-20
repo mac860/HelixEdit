@@ -188,6 +188,26 @@ private slots:
             found |= action->text().contains("update from GitHub source",Qt::CaseInsensitive);
         QVERIFY(found);
     }
+    void pasteFastaSelectsNewSequenceForMap() {
+        Editor editor(true);
+        auto *map=editor.findChild<MapView*>("plasmidMap");
+        QVERIFY(map);
+        const QString clipboardBefore=QGuiApplication::clipboard()->text();
+        QGuiApplication::clipboard()->setText(">Addgene_NGS_Result\nAAAGAATTCTTT\n");
+        QAction *paste=nullptr;
+        for(auto *action:editor.findChildren<QAction*>())
+            if(action->text()=="Paste new FASTA records"){paste=action;break;}
+        QVERIFY(paste);
+        const int oldCount=editor.model->rowCount();
+        paste->trigger();
+        QCOMPARE(editor.model->rowCount(),oldCount+1);
+        QCOMPARE(editor.table->currentIndex().row(),oldCount);
+        QCOMPARE(map->record.name,QString("Addgene_NGS_Result"));
+        QCOMPARE(map->record.sequence,QString("AAAGAATTCTTT"));
+        QVERIFY(!map->record.circular);
+        QVERIFY(map->record.features.isEmpty());
+        QGuiApplication::clipboard()->setText(clipboardBefore);
+    }
     void circularMapTracksActiveSequenceAndTopology() {
         Editor editor(true);
         const auto d=parseFasta(">Addgene_NGS_Result\nAAAGAATTCTTT\n");
