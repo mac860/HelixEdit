@@ -4,7 +4,7 @@
 int main(int argc,char **argv){
     QApplication app(argc,argv);QCoreApplication::setOrganizationName("HelixEdit");QCoreApplication::setApplicationName("HelixEdit");QCoreApplication::setApplicationVersion("0.1.3");
     // Match GNOME/Wayland desktop launcher and draw SVG into a guaranteed native icon.
-    QGuiApplication::setDesktopFileName("org.helixedit.desktop");
+    QGuiApplication::setDesktopFileName("org.helixedit");
     QPixmap appLogo(128,128);appLogo.fill(Qt::transparent);
     QSvgRenderer logoRenderer(QStringLiteral(":/packaging/helixedit.svg"));
     if(logoRenderer.isValid()){
