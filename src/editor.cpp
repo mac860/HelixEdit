@@ -182,50 +182,115 @@ void MapView::draw(QPainter &p,const QRectF &bounds) const {
     p.setFont(centerFont);p.setPen(muted);
     p.drawText(QRectF(center.x()-centerWidth/2,center.y()+2,centerWidth,20),
         Qt::AlignCenter,QLocale().toString(n)+" bp  ·  circular");
+    // Both feature labels and recognition sites are derived from the selected
+    // Record. No promoter, origin, antibiotic gene or primer is fabricated.
+    struct Callout {
+        QString title;
+        QPointF anchor;
+        QColor color;
+        bool right=false;
+        bool feature=false;
+    };
+    QVector<Callout> left,right;
+    auto addCallout=[&](const QString &label,int position,qreal offset,
+                        const QColor &color,bool isFeature){
+        const qreal theta=(position%n)*2*M_PI/n-M_PI/2;
+        const QPointF radial(std::cos(theta),std::sin(theta));
+        const QPointF anchor=center+radial*(radius+offset);
+        Callout entry{label,anchor,color,radial.x()>=0,isFeature};
+        (entry.right?right:left).append(entry);
+    };
+    if(showFeatures)for(int i=0;i<record.features.size();++i) {
+        const auto &feature=record.features[i];
+        if(feature.start<0||feature.end<=feature.start||feature.end>n)continue;
+        const int midpoint=feature.start+(feature.end-feature.start)/2;
+        const QString label=QString("%1  (%2–%3)")
+            .arg(feature.name).arg(feature.start+1).arg(feature.end);
+        addCallout(label,midpoint,18,featureColor(i),true);
+    }
+    int totalSiteCount=0,visibleSiteCount=0;
     if(showEnzymes && alphabet!="Protein") {
-        struct Callout { QString title; QPointF anchor; bool right; };
-        QVector<Callout> left,right;
         const auto sites=findRestrictionSites(record);
-        constexpr int maxLabels=24;
-        for(int i=0;i<sites.size() && i<maxLabels;++i) {
-            const auto &site=sites[i];
-            const qreal theta=site.start*2*M_PI/n-M_PI/2;
-            const QPointF radial(std::cos(theta),std::sin(theta));
-            const QPointF anchor=center+radial*(radius+10);
-            const QString title=site.enzyme+"  ("+QString::number(site.start+1)+")";
-            (radial.x()>=0?right:left).append({title,anchor,radial.x()>=0});
-        }
-        QFont labelFont=p.font();labelFont.setPointSize(9);p.setFont(labelFont);
-        const QFontMetrics metrics(labelFont);
-        auto paintLabels=[&](QVector<Callout> &labels,bool rightSide) {
-            std::sort(labels.begin(),labels.end(),[](const Callout &a,const Callout &b){
-                return a.anchor.y()<b.anchor.y();
-            });
-            const qreal x=center.x()+(rightSide?radius+41:-radius-41);
-            qreal previous=bounds.top()+14;
-            for(const auto &label:labels) {
-                const qreal y=qMax(previous,label.anchor.y());
-                if(y>bounds.bottom()-14)break;
-                const int tw=metrics.horizontalAdvance(label.title)+8;
-                const qreal textX=rightSide?x+5:x-tw-5;
-                p.setPen(QPen(dark?QColor("#718095"):QColor("#8796ac"),1));
-                p.drawLine(label.anchor,QPointF(x,y));
-                p.setPen(QPen(dark?QColor("#62d5c1"):QColor("#356fe4"),2));
-                p.drawPoint(label.anchor);
-                p.setPen(foreground);
-                p.drawText(QRectF(textX,y-10,tw,20),
-                    rightSide?Qt::AlignLeft:Qt::AlignRight,label.title);
-                previous=y+17;
-            }
-        };
-        paintLabels(left,false);paintLabels(right,true);
-        if(sites.size()>maxLabels) {
-            p.setPen(muted);
-            p.drawText(QRectF(bounds.left()+12,bounds.bottom()-31,bounds.width()-24,20),
-                Qt::AlignLeft,"Showing first 24 recognition sites of "+QString::number(sites.size())+
-                "; open Enzymes for the complete list");
+        totalSiteCount=sites.size();
+        QHash<QString,int> occurrences;
+        for(const auto &site:sites)++occurrences[site.enzyme];
+        for(const auto &site:sites) {
+            if(uniqueCuttersOnly && occurrences.value(site.enzyme)!=1)continue;
+            ++visibleSiteCount;
+            const QString label=QString("%1 (%2)")
+                .arg(site.enzyme).arg(site.start+1);
+            addCallout(label,site.start,10,
+                dark?QColor("#96b5d6"):QColor("#63778d"),false);
         }
     }
+    const int lineSpacing=16;
+    const qreal topY=bounds.top()+26;
+    const qreal bottomY=bounds.bottom()-51;
+    const int sideCapacity=qMax(1,int((bottomY-topY)/lineSpacing)+1);
+    int hiddenLabels=0;
+    QFont labelFont=p.font();labelFont.setPointSize(9);
+    p.setFont(labelFont);
+    auto paintLabels=[&](QVector<Callout> &labels,bool rightSide){
+        // Priority to provided annotations when there are too many marks.
+        if(labels.size()>sideCapacity) {
+            std::stable_sort(labels.begin(),labels.end(),[](const Callout &a,const Callout &b){
+                return a.feature && !b.feature;
+            });
+            hiddenLabels+=labels.size()-sideCapacity;
+            labels.resize(sideCapacity);
+        }
+        std::sort(labels.begin(),labels.end(),[](const Callout &a,const Callout &b){
+            return a.anchor.y()<b.anchor.y();
+        });
+        QVector<qreal> y;
+        y.reserve(labels.size());
+        for(const auto &label:labels)
+            y.append(qMax(qBound(topY,label.anchor.y(),bottomY),
+                y.isEmpty()?topY:y.last()+lineSpacing));
+        // Shift overflow upward, then preserve top-to-bottom order.
+        if(!y.isEmpty() && y.last()>bottomY) {
+            const qreal offset=y.last()-bottomY;
+            for(auto &position:y)position-=offset;
+            if(y.first()<topY) {
+                for(int i=0;i<y.size();++i)y[i]=topY+i*lineSpacing;
+            }
+        }
+        const qreal elbowX=center.x()+(rightSide?radius+34:-radius-34);
+        const qreal availableWidth=rightSide
+            ?bounds.right()-elbowX-11:elbowX-bounds.left()-11;
+        for(int i=0;i<labels.size();++i) {
+            const auto &label=labels[i];
+            const qreal lineY=y[i];
+            const int maxText=qMax(12,int(availableWidth));
+            const QString shown=QFontMetrics(labelFont)
+                .elidedText(label.title,Qt::ElideRight,maxText);
+            p.setPen(QPen(label.color,1.1));
+            p.drawLine(label.anchor,QPointF(elbowX,lineY));
+            p.setBrush(label.color);
+            p.drawEllipse(label.anchor,1.6,1.6);
+            p.setPen(label.feature?label.color:foreground);
+            p.drawText(QRectF(rightSide?elbowX+6:elbowX-6-maxText,
+                       lineY-9,maxText,19),
+                       rightSide?Qt::AlignLeft:Qt::AlignRight,shown);
+        }
+    };
+    paintLabels(left,false);
+    paintLabels(right,true);
+    if(record.features.isEmpty() && showFeatures) {
+        p.setFont(QFont(labelFont.family(),8));
+        p.setPen(muted);
+        p.drawText(QRectF(bounds.left()+12,bounds.bottom()-46,
+            bounds.width()-24,16),Qt::AlignCenter,
+            "Unannotated molecule: import a matching GenBank file for verified genes, origins and promoters");
+    }
+    p.setPen(muted);
+    p.setFont(QFont(labelFont.family(),8));
+    QString footer=QString("%1 recognition sites from %2 curated motifs")
+        .arg(totalSiteCount).arg(26);
+    if(uniqueCuttersOnly)footer+=QString("  ·  %1 unique sites shown").arg(visibleSiteCount);
+    if(hiddenLabels)footer+=QString("  ·  %1 labels hidden (see Features / Enzymes)").arg(hiddenLabels);
+    p.drawText(QRectF(bounds.left()+12,bounds.bottom()-25,bounds.width()-24,16),
+        Qt::AlignCenter,footer+"  ·  recognition starts, not cut positions");
     p.restore();
 }
 void CompositionView::paintEvent(QPaintEvent *) {
