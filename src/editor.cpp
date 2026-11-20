@@ -473,6 +473,19 @@ Editor::Editor(bool preview):preview_(preview) {
             QMessageBox::warning(this,"BLAST+ failed",stderrText.left(2000));
         else showAnalysis("BLAST+ local results",log);
     });
+    tools->addAction("View reproducible analysis history…",this,[this]{
+        const QString path=QDir(QStandardPaths::writableLocation(
+            QStandardPaths::AppDataLocation)).filePath("analysis-history.log");
+        QFile file(path);
+        if(!file.open(QIODevice::ReadOnly)){
+            QMessageBox::information(this,"Analysis history","No completed alignment or BLAST+ runs have been recorded yet.");
+            return;
+        }
+        const QByteArray bytes=file.readAll();
+        showAnalysis("Local analysis history",QString::fromUtf8(bytes.right(1024*1024))+
+            "\n\nHistory path: "+path+
+            "\nOnly the last 1 MiB is displayed; the complete file remains on disk.");
+    });
     tools->addAction("Configure executables…",this,&Editor::toolSettings);
     auto help=menuBar()->addMenu("&Help");help->addAction("About HelixEdit",this,[this]{QMessageBox::about(this,"HelixEdit 0.1.0","Independent, offline sequence editor.\nOriginal implementation inspired by familiar sequence workflows.\nNot affiliated with BioEdit or SnapGene.\n\nDevelopment preview: verify results before research use.\nSee README for format and analysis limitations.");});
     auto bar=addToolBar("Workspace");bar->setMovable(false);bar->setToolButtonStyle(Qt::ToolButtonTextOnly);
