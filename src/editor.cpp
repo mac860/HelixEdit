@@ -963,7 +963,7 @@ Editor::Editor(bool preview):preview_(preview) {
     displayRow->addWidget(complementToggle_);
     displayRow->addWidget(wrappedFeaturesToggle_);
     displayRow->addStretch(1);
-    auto modeHint=new QLabel("Wrapped preview · select a base • Grid · double-click to edit",sequenceStrip);
+    auto modeHint=new QLabel("Click to select · double-click to edit in Grid",sequenceStrip);
     modeHint->setObjectName("sequenceViewHint");
     modeHint->setToolTip("The wrapped strand view is read-only. The editable grid and undo history remain available.");
     displayRow->addWidget(modeHint);
@@ -1014,6 +1014,16 @@ Editor::Editor(bool preview):preview_(preview) {
             .arg(row+1).arg(column+1));
     };
 
+    wrapped_->onEditColumn=[this](int column){
+        if(!wrapToggle_||!table)return;
+        const int row=activeRow();
+        const QModelIndex idx=model->index(row,column);
+        if(!idx.isValid() || !(model->flags(idx)&Qt::ItemIsEditable))return;
+        wrapToggle_->setChecked(false); // Open the writable grid without modifying data.
+        table->setFocus(Qt::MouseFocusReason);
+        table->setCurrentIndex(idx);
+        table->edit(idx);
+    };
     auto actions=new QHBoxLayout;actions->setContentsMargins(10,0,10,10);
     for(auto item:QStringList{"+ Gap","Delete columns","Reverse complement","Translate"}) {
         auto b=new QPushButton(item);actions->addWidget(b);
