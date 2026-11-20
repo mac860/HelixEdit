@@ -38,7 +38,9 @@ Document parseFasta(const QString &text) {
         else { if(d.records.isEmpty()) fail("FASTA data must begin with >name."); d.records.last().sequence+=line; }
     }
     for(auto &r:d.records) r.sequence=validateSequence(r.sequence);
-    infer(d); return d;
+    infer(d);
+    d.warnings << "FASTA carries no topology/feature annotations; confirm circularity and import sequence-matched GenBank annotations separately.";
+    return d;
 }
 QString fasta(const Document &d) {
     QString out;
