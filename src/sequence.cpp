@@ -112,8 +112,19 @@ Document parseGenBank(const QString &text) {
                     int start=m.captured(2).toInt()-1, end=m.captured(3).isEmpty()?start+1:m.captured(3).toInt();
                     r.features.append(Feature{key,key,start,end,!m.captured(1).isEmpty()}); active=r.features.size()-1;
                 } else if(active>=0) {
-                    auto m=QRegularExpression("^/(label|gene|product)=\"([^\"]+)\"").match(loc);
-                    if(m.hasMatch()) r.features[active].name=m.captured(2);
+                    // GenBank labels may be unquoted (/label=AmpR promoter)
+                    // or quoted (/label="AmpR promoter"). Keep original names
+                    // rather than replacing them with generic feature types.
+                    const auto m=QRegularExpression(
+                        R"(^/(label|gene|product)\s*=\s*(?:"([^"]+)"|(.+))$)").match(loc);
+                    if(m.hasMatch()) {
+                        const QString value=(m.captured(2).isEmpty()?
+                            m.captured(3):m.captured(2)).trimmed();
+                        if(!value.isEmpty() &&
+                           (m.captured(1)=="label" ||
+                            r.features[active].name==r.features[active].type))
+                            r.features[active].name=value;
+                    }
                 }
             }
         }
