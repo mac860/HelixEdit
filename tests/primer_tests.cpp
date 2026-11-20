@@ -19,7 +19,7 @@ private slots:
  }
  void circular() {
   Record r;r.sequence="CGTAAAAAACG";r.circular=true;
-  auto hits=primerHits(r,"ACGCGTAA");
+  auto hits=primerHits(r,"CGCGTAAA");
   QCOMPARE(hits.size(),1);
   QCOMPARE(hits[0].start,9);
   QCOMPARE(hits[0].end,17);
