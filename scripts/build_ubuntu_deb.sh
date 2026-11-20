@@ -46,5 +46,18 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir "$BUILD_DIR" --output-on-failure
 )
 echo "Generated packages:"
 find "$BUILD_DIR" -maxdepth 1 -type f -name '*.deb' -print
+shopt -s nullglob
+packages=("$BUILD_DIR"/*.deb)
+if (( ${#packages[@]} == 0 )); then
+  echo "CPack reported success but no .deb was generated." >&2
+  exit 1
+fi
+for package in "${packages[@]}"; do
+  dpkg-deb --info "$package"
+  dpkg-deb --contents "$package" | grep -E '/usr/(bin/helixedit|share/applications/org.helixedit.desktop)' || {
+    echo "Package missing executable or desktop launcher: $package" >&2
+    exit 1
+  }
+done
 echo "Inspect with: dpkg-deb --info '$BUILD_DIR'/HelixEdit-*.deb"
 echo "Install with: sudo apt install '$BUILD_DIR'/HelixEdit-*.deb"
