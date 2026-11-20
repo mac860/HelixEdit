@@ -16,6 +16,23 @@ The interface uses a compact top toolbar, left searchable sequence navigator, an
 
 The built-in enzyme catalog remains an eight-motif scientific preview, not a full digest simulator. Primer3 and other scientific engines require their own optional installations. See [GUI design, functionality and validation notes](docs/GUI_012.md).
 
+## Settings & preferences (0.1.3 beta)
+
+Open **Settings → Preferences…** or use the **Settings** button in the toolbar (**Ctrl+,**). The former Appearance menu has been removed; related configuration is now gathered in one place:
+
+- **Appearance:** choose Light, Dark or Dracula, and the default document view (Map or Sequence).
+- **Map & editing:** visibility of enzyme labels and annotated features; initial map zoom; local autosave interval (30 seconds, 1, 2 or 5 minutes).
+- **Scientific tools:** optional executable paths for MAFFT, MUSCLE, BLASTN, BLASTP and Primer3. Leave entries blank to search PATH. Primer3 now honors the configured executable path.
+- **Updates:** choose and remember the existing Git source checkout for in-app, user-initiated updates. There are no periodic background update checks.
+
+Press **Save settings** to apply. **Restore defaults** fills the default values so they can be reviewed before saving; **Cancel** keeps the previous settings. Preferences are stored locally with Qt QSettings and do not modify sequence data.
+
+### About and maintainer
+
+**Help → About HelixEdit** displays the application version, repository and developer attribution:
+
+**Developed and edited by Wael H** · [waelye@gmail.com](mailto:waelye@gmail.com) · [HelixEdit GitHub repository](https://github.com/mac860/HelixEdit).
+
 ## 0.1.3: Update from GitHub source in the app
 
 After installing **HelixEdit 0.1.3 or later**, click **Update** in the upper-right toolbar or choose **Help → Check / update from GitHub source…**. Select the **existing Git clone** (for example `~/Downloads/helix2/HelixEdit`) once; its location is remembered. The app offers two operations:
