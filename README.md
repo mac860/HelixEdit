@@ -4,11 +4,23 @@
 
 Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
 
-**Status: 0.1.7 beta development on `main` (fresh build/CI verification pending).** The importer now handles Addgene-style GenBank metadata URLs and unquoted feature labels; a new native Ubuntu build is required to verify the changes.
+**Status: 0.1.8 beta development on `main` (new GUI compilation/CI verification pending).** The compact workspace and About dialog changes are committed with GUI regression checks; native Ubuntu and macOS builds of this version still need to pass.
 
 ![HelixEdit sequence map](docs/map.png)
 
 ![HelixEdit alignment editor](docs/alignment.png)
+
+## New in 0.1.8: compact scientific workspace and redesigned About
+
+The light-theme screenshots showed three sources of wasted vertical space: a tall toolbar, a duplicate command strip and a persistent cream-colored document-warning banner. The **0.1.8 layout reclaims these areas** for the Sequence and Map workspaces.
+
+- **Compact icon-first toolbar:** Open, Save, Undo, Redo, Copy/Paste FASTA, Examples and Add Sequence remain available, with descriptive tooltips. Molecule type and **Find motif** now share this top row rather than occupying another full row. Settings and Update stay accessible from the toolbar and menus.
+- **Smaller contextual ribbon:** Sequence, Plasmid and Analysis action tabs are reduced to a compact height; all buttons retain their original menu actions and shortcuts.
+- **No milky notification banner:** scientific FASTA/GenBank notices are not lost. Their count and complete tooltip now live in the **status bar**, and the complete text is accessible through **Help → Document notices…**.
+- **More canvas space:** the redundant bottom action-button row was removed from the Sequence view. Its operations remain in Edit/Analysis menus and in the editable grid's right-click context menu. The central tabbed workspace expands to use the reclaimed height.
+- **Creative About dialog:** **Help → About HelixEdit** now displays the **same purple/teal SVG application icon** as the window/launcher, a gradient hero, a live version badge, feature focus, **Developed and edited by Wael H**, [waelye@gmail.com](mailto:waelye@gmail.com), and [github.com/mac860/HelixEdit](https://github.com/mac860/HelixEdit). Its **Open GitHub** and **Copy repository link** actions are functional. It retains the independent-beta scientific validation notice.
+
+**Validation:** GUI tests cover compact toolbar controls, the absence of a central warning strip, and the About dialog icon, contributor links and copy operation. A fresh Ubuntu 26.04 build/CTest run is still required. [0.1.8 visual change notes](docs/GUI_018.md).
 
 ## New in 0.1.7: corrected GenBank / FASTA import
 
@@ -169,12 +181,12 @@ git pull --ff-only origin main
 bash scripts/build_ubuntu_deb.sh
 ```
 
-The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.7-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
+The script creates a fresh architecture-specific directory such as `build-ubuntu-amd64`, compiles the app and test binaries, runs CTest in Qt offscreen mode, and creates a versioned `HelixEdit-0.1.8-x86_64.deb` (exact filename depends on the CMake architecture). Build logs are saved under `build-logs/`.
 
 Install the generated package (use the exact path printed by the script):
 
 ```bash
-sudo apt install --reinstall ./build-ubuntu-amd64/HelixEdit-0.1.7-x86_64.deb
+sudo apt install --reinstall ./build-ubuntu-amd64/HelixEdit-0.1.8-x86_64.deb
 helixedit
 ```
 
