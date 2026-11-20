@@ -1,4 +1,5 @@
 #include "editor.h"
+#include "themes.h"
 #include <QtSvg/QSvgGenerator>
 #include <QDesktopServices>
 #include <cmath>
@@ -103,25 +104,17 @@ public:
 Editor::Editor(bool preview):preview_(preview) {
     setWindowTitle("HelixEdit");resize(1180,760);setMinimumSize(860,580);
     model=new AlignmentModel(this);history=new QUndoStack(this);history->setUndoLimit(30);
-    setStyleSheet(R"(
-      QMainWindow,QDialog {background:#f5f3fa;color:#29283c;}
-      QWidget {font-family:"Inter","Segoe UI","DejaVu Sans";font-size:12px;color:#29283c;}
-      QToolBar {background:#fff;border:0;border-bottom:1px solid #e7e1f2;spacing:7px;padding:9px;}
-      QToolButton,QPushButton {background:#eee9fa;border:0;border-radius:7px;padding:7px 11px;color:#55408a;}
-      QToolButton:hover,QPushButton:hover {background:#dfd5f5;}
-      QPushButton:disabled,QToolButton:disabled {color:#a9a1b9;background:#f3f0f7;}
-      QLineEdit,QComboBox,QPlainTextEdit,QListWidget {background:white;border:1px solid #e2ddec;border-radius:7px;padding:6px;selection-background-color:#7c5ce7;}
-      QTabWidget::pane {border:1px solid #e4dfed;border-radius:10px;background:white;}
-      QTabBar::tab {padding:10px 17px;color:#746c89;background:transparent;}
-      QTabBar::tab:selected {color:#6542c1;border-bottom:3px solid #805ae2;}
-      QHeaderView::section {background:#f5f2fa;border:0;border-right:1px solid white;border-bottom:1px solid #e6dfef;padding:5px;color:#706480;}
-      QTableView {background:white;border:0;gridline-color:#fff;selection-background-color:#8262d5;selection-color:white;}
-      QGroupBox {background:white;border:1px solid #e6dfef;border-radius:9px;margin-top:10px;padding:12px;}
-      QGroupBox::title {subcontrol-origin:margin;left:12px;padding:0 5px;color:#71638d;}
-      QStatusBar {background:#ebe5f7;color:#67578b;}
-      QSplitter::handle {background:#f5f3fa;}
-      QMenuBar {background:#fff;} QMenu {background:white;}
-    )");
+    applyTheme(savedTheme());
+    auto appearance=menuBar()->addMenu("&Appearance");
+    auto themeGroup=new QActionGroup(this);
+    themeGroup->setExclusive(true);
+    for(const QString &theme : {QString("Light"),QString("Dark"),QString("Dracula")}) {
+        auto action=appearance->addAction(theme);
+        action->setCheckable(true);
+        action->setChecked(theme==savedTheme());
+        themeGroup->addAction(action);
+        connect(action,&QAction::triggered,this,[theme]{applyTheme(theme);});
+    }
     auto fileMenu=menuBar()->addMenu("&File");
     auto actOpen=fileMenu->addAction("Open…",QKeySequence::Open,this,&Editor::open);
     auto actSave=fileMenu->addAction("Save project",QKeySequence::Save,this,[this]{save();});
