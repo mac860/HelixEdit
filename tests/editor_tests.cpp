@@ -3,6 +3,7 @@
 #include "source_discovery.h"
 #include "restriction.h"
 #include <algorithm>
+#include <cmath>
 #include <QtSvg/QSvgRenderer>
 #include <QtTest>
 using namespace helix;
@@ -112,6 +113,83 @@ private slots:
         QCOMPARE(discoverSourceFolder(),QDir(temp.path()).canonicalPath());
         if(before.isValid())settings.setValue("updater/source",before);
         else settings.remove("updater/source");
+    }
+    void compactIconRailAndPersistentSidebar() {
+        QSettings saved("HelixEdit","HelixEdit");
+        const QVariant before=saved.value("workspace/toolPanelVisible");
+        saved.setValue("workspace/toolPanelVisible",false);
+        {
+            Editor editor(true);
+            auto *rail=editor.findChild<QFrame*>("activityRail");
+            auto *tools=editor.findChild<QFrame*>("workspaceToolPanel");
+            auto *toggle=editor.findChild<QToolButton*>("toggleWorkspaceTools");
+            auto *menu=editor.findChild<QAction*>("showWorkspaceSidebar");
+            auto *project=editor.findChild<QToolButton*>("toggleProjectExplorer");
+            QVERIFY(rail);QVERIFY(tools);QVERIFY(toggle);QVERIFY(menu);QVERIFY(project);
+            QCOMPARE(rail->width(),56);
+            QCOMPARE(toggle->toolButtonStyle(),Qt::ToolButtonIconOnly);
+            QCOMPARE(project->toolButtonStyle(),Qt::ToolButtonIconOnly);
+            QVERIFY(!toggle->isChecked());
+            QVERIFY(tools->isHidden());
+            QVERIFY(menu->shortcut()==QKeySequence("Ctrl+Shift+S"));
+            for(const QString &id:{"activitySequence","activityPlasmid","activityAnalysis"}) {
+                auto *button=editor.findChild<QToolButton*>(id);
+                QVERIFY(button);
+                QCOMPARE(button->toolButtonStyle(),Qt::ToolButtonIconOnly);
+                QVERIFY(!button->icon().isNull());
+                QVERIFY(!button->toolTip().isEmpty());
+                QCOMPARE(button->width(),46);
+            }
+            menu->setChecked(true);
+            QVERIFY(toggle->isChecked());
+            QVERIFY(!tools->isHidden());
+            QVERIFY(saved.value("workspace/toolPanelVisible").toBool());
+            toggle->setChecked(false);
+            QVERIFY(!menu->isChecked());
+            QVERIFY(tools->isHidden());
+            QVERIFY(!saved.value("workspace/toolPanelVisible").toBool());
+        }
+        if(before.isValid())saved.setValue("workspace/toolPanelVisible",before);
+        else saved.remove("workspace/toolPanelVisible");
+    }
+    void vividCircularFeatureTracksUseOriginalCoordinates() {
+        const QString prior=savedTheme();
+        applyTheme("Light");
+        MapView map;
+        map.alphabet="DNA";
+        map.showEnzymes=false;
+        map.showFeatures=true;
+        map.record=Record{"visual-test",QString(1000,'A'),
+            {Feature{"Origin","rep_origin",0,250,false},
+             Feature{"CDS","CDS",400,650,true}},true};
+        auto render=[&]{
+            QImage canvas(900,740,QImage::Format_ARGB32_Premultiplied);
+            canvas.fill(Qt::transparent);
+            QPainter painter(&canvas);
+            map.draw(painter,QRectF(0,0,900,740));
+            painter.end();
+            return canvas;
+        };
+        const QImage withFeatures=render();
+        map.showFeatures=false;
+        const QImage noFeatures=render();
+        QVERIFY(withFeatures!=noFeatures);
+        // First origin interval is 0..249. Its true midpoint is 125,
+        // clockwise from 12 o'clock, on the first feature lane.
+        const qreal radius=qMax<qreal>(64,qMin(900*.245,740*.29)*map.zoom);
+        const qreal trackRadius=radius-13;
+        const qreal theta=125.0*2*M_PI/1000-M_PI/2;
+        const int px=qRound(450+std::cos(theta)*trackRadius);
+        const int py=qRound(370+std::sin(theta)*trackRadius);
+        const QColor originPixel=withFeatures.pixelColor(px,py);
+        const QColor backgroundPixel=noFeatures.pixelColor(px,py);
+        QVERIFY(originPixel!=backgroundPixel);
+        QVERIFY2(originPixel.red()>185 && originPixel.green()>155 &&
+                 originPixel.blue()<135,
+                 "Origin feature should appear as a bright golden band.");
+        map.record.features.clear();
+        QVERIFY(render()==noFeatures);
+        applyTheme(prior);
     }
     void v020ActivityRailAndContextViews() {
         Editor editor(true);
