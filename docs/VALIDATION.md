@@ -15,6 +15,8 @@ Environment: Ubuntu 26.04 x86_64, GCC 15.2.0, Qt 6.10.2, CMake release build.
 - Created `HelixEdit-0.1.0-x86_64.deb` with CPack's dependency discovery. The compressed package was approximately 157 KiB; it depends on separately installed system Qt libraries.
 - Optional Python scripts passed syntax checks; Biopython conversion was not executed because Biopython was not installed locally.
 
+- Extracted the generated Debian package and launched its installed-path executable successfully in offscreen preview mode; desktop entry and icon were present.
+
 ## Small rendering benchmark
 
 A synthetic FASTA with 1,000 sequences × 2,000 residues (2 million alignment cells) was opened and rendered offscreen to a PNG by the release executable.
@@ -28,6 +30,16 @@ This is a single smoke measurement on the development host, not an ARM64 perform
 
 ## Native platform verification
 
-The GitHub Actions workflow provisions native Ubuntu x86_64, Ubuntu ARM64 and macOS ARM64 runners, installs the local alignment packages, runs tests and uploads installable build artifacts. Those native jobs must complete successfully before the corresponding packages are described as tested. Actual Mac M1 / Ubuntu ARM64 desktop interaction still needs target-device testing.
+[GitHub Actions run 44783359673](https://github.com/mac860/HelixEdit/actions/runs/44783359673) verified the following on native hardware:
+
+| Target | Build | Core + editor + real-aligner tests | Preview render | Package |
+|---|---|---|---|---|
+| Ubuntu 24.04 x86_64 / Qt 6.4.2 | Passed | Passed | Passed | `.deb` uploaded |
+| Ubuntu 24.04 ARM64 / Qt 6.4.2 | Passed | Passed | Passed | `.deb` uploaded |
+| macOS ARM64 | Runner queued | Pending | Not run | Pending |
+
+The first Ubuntu ARM64 run passed the editor and MAFFT tests but failed with the distribution's MUSCLE 5.1 package. Upstream documents an ARM64 pointer-width detection bug. The corrected workflow builds pinned MUSCLE 5.3 with the upstream platform-detection fix; the complete ARM64 test suite then passed in 0.85 seconds. The helper does not bundle or modify MUSCLE in the HelixEdit `.deb`; users who want MUSCLE on Linux ARM64 can build it separately using the documented helper.
+
+The Apple Silicon job is waiting for GitHub runner allocation. No successful macOS compilation or app package is claimed yet. Actual Mac M1 / Ubuntu ARM64 desktop interaction still needs target-device testing.
 
 The macOS artifact is ad-hoc signed, not Developer ID signed or notarized. No Windows binary compatibility, BioEdit binary-project compatibility, direct SnapGene editing or full GenBank metadata round-trip is claimed.

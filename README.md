@@ -4,7 +4,7 @@
 
 Original C++17 / Qt 6 implementation inspired by BioEdit's practical editing workflow and the visual clarity of modern sequence-map tools. Independent of BioEdit and SnapGene; no original code or proprietary assets are included.
 
-**Status: 0.1.0 development preview.** The Linux x86_64 build and automated workflows are tested locally. Native macOS and Linux ARM64 build jobs are supplied; a successful job and target-device testing are required before calling those distributions verified. Full BioEdit feature parity is not claimed.
+**Status: 0.1.0 development preview.** Local Linux x86_64 tests pass. Native Ubuntu 24.04 x86_64 and ARM64 CI builds, real-aligner integration tests, rendering and Debian packaging have also passed. The Apple Silicon build job is supplied but remains queued; macOS is not yet verified. Target-device desktop testing is still recommended. Full BioEdit feature parity is not claimed.
 
 ![HelixEdit sequence map](docs/map.png)
 
@@ -112,6 +112,17 @@ python scripts/convert_sequences.py alignment.phy alignment.fasta --input-format
 The converter never overwrites an existing output. Keep original files: traces, quality values, annotations and topology are omitted from FASTA.
 
 ## Build artifacts
+
+Verified preview packages from [build run 44783359673](https://github.com/mac860/HelixEdit/actions/runs/44783359673):
+
+| Platform | Download | Verification |
+|---|---|---|
+| Ubuntu ARM64 | [ARM64 artifact ZIP](https://github.com/mac860/HelixEdit/actions/runs/44783359673/artifacts/14653216507) | Native build, tests, rendering and packaging passed |
+| Ubuntu x86_64 | [x86_64 artifact ZIP](https://github.com/mac860/HelixEdit/actions/runs/44783359673/artifacts/14653331410) | Native build, tests, rendering and packaging passed |
+| macOS Apple Silicon | See build run when its queued job completes | Not yet verified |
+
+Extract the artifact ZIP, then install its `.deb` with `sudo apt install ./HelixEdit-*.deb`. The included images are interface previews. Artifacts expire under GitHub's retention policy; rebuild with the workflow if a download expires.
+
 
 The **Build and test** GitHub Actions workflow builds Ubuntu x86_64, Ubuntu ARM64 and macOS ARM64 packages. Successful runs upload `.deb` files or a macOS app ZIP under the run's **Artifacts** section. Artifacts require GitHub sign-in for this private repository. ARM64 binaries are produced on ARM64 runners. CI artifacts are previews, not notarized releases.
 
