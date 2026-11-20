@@ -194,10 +194,24 @@ void WrappedSequenceView::mousePressEvent(QMouseEvent *event) {
     QAbstractScrollArea::mousePressEvent(event);
 }
 
+void WrappedSequenceView::mouseDoubleClickEvent(QMouseEvent *event) {
+    if(event->button()==Qt::LeftButton) {
+        const int column=alignmentColumnAt(event->pos());
+        if(column>=0) {
+            setSelectedColumn(column);
+            if(onColumnActivated)onColumnActivated(column);
+            if(onEditColumn)onEditColumn(column);
+            event->accept();
+            return;
+        }
+    }
+    QAbstractScrollArea::mouseDoubleClickEvent(event);
+}
+
 void WrappedSequenceView::paintEvent(QPaintEvent *) {
     QPainter p(viewport());
     p.setRenderHint(QPainter::Antialiasing,true);
-    const bool dark=isDarkTheme(savedTheme());
+    const bool dark=isDarkTheme(qApp->property("helix-theme").toString());
     const QColor background(dark?"#151c28":"#f7faff");
     const QColor card(dark?"#222b3b":"#ffffff");
     const QColor titleColor(dark?"#f1f5fc":"#253750");
