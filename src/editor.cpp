@@ -604,6 +604,10 @@ Editor::Editor(bool preview):preview_(preview) {
     actSave->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
     undo->setIcon(style()->standardIcon(QStyle::SP_ArrowBack));
     redo->setIcon(style()->standardIcon(QStyle::SP_ArrowForward));
+    copyAction->setText("Copy FASTA");
+    copyAction->setToolTip("Copy the selected alignment rectangle as sequence-only FASTA");
+    pasteAction->setText("Paste FASTA");
+    pasteAction->setToolTip("Append FASTA records from the clipboard");
     copyAction->setIcon(style()->standardIcon(QStyle::SP_FileIcon));
     pasteAction->setIcon(style()->standardIcon(QStyle::SP_DialogApplyButton));
     bar->addAction(actOpen);bar->addAction(actSave);bar->addSeparator();
