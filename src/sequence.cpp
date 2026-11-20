@@ -4,7 +4,12 @@ namespace helix {
 static void fail(const QString &s) { throw std::runtime_error(s.toStdString()); }
 QString validateSequence(QString s) {
     s.remove(QRegularExpression("\\s")); s=s.toUpper(); s.replace('.', '-');
-    if(s.isEmpty() || s.contains(QRegularExpression("[^A-Z*?-]"))) fail("Invalid or empty sequence. Use letters, -, ?, or *.");
+    if(s.isEmpty())
+        fail("Sequence is empty. A FASTA record needs a header (>name) followed by at least one sequence line.");
+    const auto illegal=QRegularExpression("[^A-Z*?-]").match(s);
+    if(illegal.hasMatch())
+        fail(QString("Invalid sequence character '%1' at character %2. Remove line numbers, punctuation and file metadata; sequence lines may use letters, -, ?, or *.")
+            .arg(illegal.captured()).arg(illegal.capturedStart()+1));
     return s;
 }
 QString ungapped(QString s) { s.remove('-'); s.remove('.'); return s; }
@@ -39,7 +44,13 @@ Document parseFasta(const QString &text) {
         if(line.startsWith('>')) { d.records.append(Record{line.mid(1).trimmed(),{},{},false}); }
         else { if(d.records.isEmpty()) fail("FASTA data must begin with >name."); d.records.last().sequence+=line; }
     }
-    for(auto &r:d.records) r.sequence=validateSequence(r.sequence);
+    for(auto &r:d.records) {
+        try {
+            r.sequence=validateSequence(r.sequence);
+        } catch(const std::exception &e) {
+            fail(QString("FASTA record '%1': %2").arg(r.name,QString::fromUtf8(e.what())));
+        }
+    }
     infer(d);
     d.warnings << "FASTA carries no topology/feature annotations; confirm circularity and import sequence-matched GenBank annotations separately.";
     return d;
