@@ -28,6 +28,7 @@ public:
     QString alphabet="DNA";
     bool showEnzymes=true;
     bool showFeatures=true;
+    bool uniqueCuttersOnly=true;
     qreal zoom=1.0;
     void setZoom(qreal value) {zoom=qBound<qreal>(0.65,value,1.35);update();}
     void draw(QPainter &p,const QRectF &bounds) const;
@@ -90,6 +91,8 @@ private:
     QComboBox *molecule_;
     QCheckBox *mapEnzymeToggle_=nullptr;
     QCheckBox *mapFeatureToggle_=nullptr;
+    QCheckBox *circularTopologyToggle_=nullptr;
+    QCheckBox *uniqueCuttersToggle_=nullptr;
     QLineEdit *search_;
     QPlainTextEdit *log_;
     QProcess *process_=nullptr;
@@ -105,6 +108,7 @@ private:
     void exportFile();
     void addSequence();
     void addFeature();
+    void importMatchingGenBankAnnotations();
     void translateSelected();
     void findNext();
     void showSettings();
