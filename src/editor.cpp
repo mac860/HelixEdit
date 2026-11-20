@@ -445,6 +445,17 @@ Editor::Editor(bool preview):preview_(preview) {
         }
     });
     auto actOpen=fileMenu->addAction("Open…",QKeySequence::Open,this,&Editor::open);
+    fileMenu->addAction("New document from FASTA clipboard…",QKeySequence("Ctrl+Shift+V"),this,[this]{
+        if(!canReplace())return;
+        runSafely([&]{
+            auto incoming=parseFasta(QGuiApplication::clipboard()->text());
+            setDocument(incoming);
+            if(model->columnCount()>0)table->setCurrentIndex(model->index(0,0));
+            tabs_->setCurrentIndex(incoming.alphabet=="Protein"?1:0);
+            statusBar()->showMessage("FASTA loaded as new document. No topology or functional features are implied.");
+        });
+    });
+
     auto actSave=fileMenu->addAction("Save project",QKeySequence::Save,this,[this]{save();});
     fileMenu->addAction("Save project as…",QKeySequence::SaveAs,this,[this]{save(true);});
     auto examplesMenu=fileMenu->addMenu("Open teaching examples");
@@ -564,7 +575,24 @@ Editor::Editor(bool preview):preview_(preview) {
         for(int row=range.top();row<=range.bottom();++row){auto r=model->document.records[row];r.sequence=r.sequence.mid(range.left(),range.width());r.features.clear();r.circular=false;if(!r.sequence.isEmpty())block.records.append(r);}
         QGuiApplication::clipboard()->setText(fasta(block));statusBar()->showMessage("Selected block copied as sequence-only FASTA.");
     });
-    auto pasteAction=edit->addAction("Paste new FASTA records",QKeySequence::Paste,this,[this]{if(busy())return;runSafely([&]{auto incoming=parseFasta(QGuiApplication::clipboard()->text());auto d=model->document;d.records+=incoming.records;commit(d,"Paste sequences");});});
+    auto pasteAction=edit->addAction("Paste new FASTA records",QKeySequence::Paste,this,[this]{
+        if(busy())return;
+        runSafely([&]{
+            auto incoming=parseFasta(QGuiApplication::clipboard()->text());
+            auto d=model->document;
+            if(d.alphabet!=incoming.alphabet)
+                throw std::runtime_error("The pasted molecule alphabet differs from the project. Open it as a new document instead.");
+            const int firstNewRow=d.records.size();
+            d.records+=incoming.records;
+            d.warnings+=incoming.warnings;
+            commit(d,"Paste sequences");
+            // A newly pasted vector must become active immediately; otherwise
+            // Map keeps showing the previous demo or sequence.
+            if(model->columnCount()>0)
+                table->setCurrentIndex(model->index(firstNewRow,0));
+            statusBar()->showMessage("Pasted FASTA is selected. Confirm circular topology in Map and attach validated GenBank features if available.");
+        });
+    });
     edit->addAction("Rename active sequence…",this,[this]{if(busy())return;bool ok=false;int row=activeRow();auto name=QInputDialog::getText(this,"Rename sequence","Name",QLineEdit::Normal,model->document.records[row].name,&ok);if(ok)runSafely([&]{auto d=model->document;d.records[row].name=name.trimmed();commit(d,"Rename sequence");});});
     edit->addAction("Remove selected sequences…",this,[this]{
         if(busy())return;
